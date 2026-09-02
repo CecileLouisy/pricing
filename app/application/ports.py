@@ -1,7 +1,7 @@
-"""Interfaces sortantes (ports) implémentées par les adapters/db.
+"""Outbound interfaces (ports) implemented by adapters/db.
 
-Utilisation de `typing.Protocol` pour ne pas forcer d'héritage : n'importe quelle
-implémentation qui présente ces méthodes satisfait le contrat.
+Uses `typing.Protocol` to avoid forcing inheritance: any implementation that
+exposes these methods satisfies the contract.
 """
 
 from typing import Protocol
@@ -18,7 +18,7 @@ class GridRepository(Protocol):
     def list_all(self) -> list[PriceGrid]: ...
 
     def publish(self, new_grid: PriceGrid) -> PriceGrid:
-        """Ferme la grille active (effective_to = now) et enregistre la nouvelle."""
+        """Close the currently active grid (effective_to = now) and persist the new one."""
         ...
 
 

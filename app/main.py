@@ -1,4 +1,4 @@
-"""Point d'entrée FastAPI — assemblage de l'application."""
+"""FastAPI entry point — application assembly."""
 
 from contextlib import asynccontextmanager
 
@@ -11,16 +11,16 @@ from app.adapters.db.engine import init_db
 from app.config import settings
 
 API_DESCRIPTION = """
-Service de tarification du projet Parking Management.
+Pricing service of the Parking Management project.
 
-**Rôle** : calculer le prix d'un stationnement ou d'une réservation à partir
-d'une grille tarifaire versionnée, en garantissant la traçabilité de la grille
-utilisée pour chaque calcul.
+**Role**: compute the price of a parking session or a reservation from a
+versioned price grid, guaranteeing traceability of the grid used for every
+computation.
 
-- Lectures publiques (grille active, historique)
-- Écritures réservées à l'admin (header `X-Admin-Token`)
-- Chaque modification crée une nouvelle version de grille
-- Chaque devis calculé est persisté et lié à sa grille
+- Public reads (active grid, history)
+- Admin-only writes (`X-Admin-Token` header)
+- Every change publishes a new grid version
+- Every computed quote is persisted and linked to its grid
 """
 
 

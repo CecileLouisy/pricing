@@ -1,10 +1,10 @@
-"""Tests d'intégration bout en bout — HTTP + SQLite en mémoire."""
+"""End-to-end integration tests — HTTP + in-file SQLite."""
 
 import os
 
 import pytest
 
-# Force une base SQLite éphémère avant l'import de l'app
+# Force an ephemeral SQLite database before importing the app
 os.environ["DATABASE_URL"] = "sqlite:///./test_pricing.db"
 os.environ["ADMIN_TOKEN"] = "test-token"
 
@@ -42,9 +42,11 @@ class TestQuote:
         )
         assert r.status_code == 201
         body = r.json()
-        assert body["amount_eur"] == "3.00"
+        # Seed: standard/walk_in = 3.00 EUR/h, free_period = 60 min
+        # (75 - 60) = 15 billable -> 1 quarter -> 0.75 EUR
+        assert body["amount_eur"] == "0.75"
         assert body["currency"] == "EUR"
-        assert body["breakdown"]["quarters"] == 4
+        assert body["breakdown"]["quarters"] == 1
         assert body["grid_version"] == 1
 
     def test_reserved_computes_price(self, client):
@@ -53,7 +55,7 @@ class TestQuote:
             json={"zone": "xl", "mode": "reserved", "duration_min": 120},
         )
         assert r.status_code == 201
-        assert r.json()["amount_eur"] == "8.00"  # 2h × 4.00
+        assert r.json()["amount_eur"] == "8.00"  # 2h x 4.00
 
     def test_unknown_zone_returns_404(self, client):
         r = client.post(
@@ -63,17 +65,17 @@ class TestQuote:
         assert r.status_code == 404
         assert r.json()["code"] == "ZONE_NOT_FOUND"
 
-    def test_invalid_duration_returns_400(self, client):
+    def test_invalid_duration_returns_422(self, client):
         r = client.post(
             "/quote",
             json={"zone": "standard", "mode": "walk_in", "duration_min": 0},
         )
-        assert r.status_code == 422  # Pydantic (gt=0) intercepte avant le domaine
+        assert r.status_code == 422  # Pydantic (gt=0) intercepts before domain
 
     def test_quote_can_be_retrieved(self, client):
         created = client.post(
             "/quote",
-            json={"zone": "standard", "mode": "walk_in", "duration_min": 60},
+            json={"zone": "standard", "mode": "walk_in", "duration_min": 120},
         ).json()
         r = client.get(f"/quotes/{created['quote_id']}")
         assert r.status_code == 200
@@ -84,7 +86,7 @@ class TestRates:
     def test_public_list(self, client):
         r = client.get("/rates")
         assert r.status_code == 200
-        assert len(r.json()) == 10  # 5 zones × 2 modes
+        assert len(r.json()) == 10  # 5 zones x 2 modes
 
     def test_admin_update_creates_new_grid(self, client):
         r = client.patch(
@@ -103,21 +105,21 @@ class TestRates:
         assert r.status_code == 401
 
     def test_old_quote_survives_rate_change(self, client):
-        # 1. Créer un devis
+        # 1. Emit a quote
         created = client.post(
             "/quote",
-            json={"zone": "standard", "mode": "walk_in", "duration_min": 60},
+            json={"zone": "standard", "mode": "walk_in", "duration_min": 120},
         ).json()
         old_amount = created["amount_eur"]
 
-        # 2. L'admin change le tarif
+        # 2. Admin changes the rate
         client.patch(
             "/rates/standard/walk_in",
             headers={"X-Admin-Token": "test-token"},
             json={"hourly_rate_eur": "99.00"},
         )
 
-        # 3. L'ancien devis conserve son montant et sa référence de grille
+        # 3. The old quote keeps its amount and grid reference
         retrieved = client.get(f"/quotes/{created['quote_id']}").json()
         assert retrieved["amount_eur"] == old_amount
         assert retrieved["grid_id"] == created["grid_id"]
@@ -139,7 +141,7 @@ class TestSettings:
     def test_get_free_period(self, client):
         r = client.get("/settings/free-period")
         assert r.status_code == 200
-        assert r.json()["free_period_min"] == 15
+        assert r.json()["free_period_min"] == 60
 
     def test_admin_update_free_period(self, client):
         r = client.patch(

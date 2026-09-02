@@ -1,4 +1,4 @@
-"""Entités et agrégats du domaine — dataclasses immutables."""
+"""Domain entities and aggregates — immutable dataclasses."""
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -10,7 +10,11 @@ from app.domain.value_objects import Mode
 
 @dataclass(frozen=True, slots=True)
 class Rate:
-    """Un tarif horaire pour une combinaison (zone, mode) dans une grille."""
+    """Hourly rate for a (zone, mode) combination within a grid.
+
+    Identified by a random UUID (v4): a rate has no time semantics of its own,
+    it belongs to the grid that carries the effective dates.
+    """
 
     id: UUID
     grid_id: UUID
@@ -21,10 +25,13 @@ class Rate:
 
 @dataclass(frozen=True, slots=True)
 class PriceGrid:
-    """Grille tarifaire versionnée.
+    """Versioned price grid.
 
-    Une grille est immuable une fois publiée. Toute modification d'un tarif
-    ou de la gratuité crée une nouvelle grille.
+    A grid is immutable once published. Any change to a rate or the free
+    period creates a brand new grid.
+
+    Identified by a time-ordered UUID (v7): grids have effective dates and
+    benefit from chronological sortability at the storage level.
     """
 
     id: UUID
@@ -44,7 +51,11 @@ class PriceGrid:
 
 @dataclass(frozen=True, slots=True)
 class Quote:
-    """Un devis calculé, immuable, référence la grille utilisée."""
+    """An emitted quote — immutable, references the grid used at computation time.
+
+    Identified by a time-ordered UUID (v7): quotes are inherently timestamped
+    events and querying them by time range is a common access pattern.
+    """
 
     id: UUID
     grid_id: UUID

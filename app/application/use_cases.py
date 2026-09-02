@@ -1,13 +1,18 @@
-"""Use cases — orchestration des règles du domaine et des ports.
+"""Use cases — orchestration of domain rules and ports.
 
-Chaque use case est une fonction pure d'orchestration. Elle reçoit ses
-dépendances (repositories) en paramètres, permettant de tester avec des
-implémentations en mémoire.
+Each use case is a plain function receiving its dependencies (repositories)
+as parameters, allowing tests to inject in-memory implementations.
+
+UUID convention:
+  - PriceGrid and Quote → uuid7 (time-ordered, better for chronological queries)
+  - Rate                → uuid4 (random, no time semantics)
 """
 
 from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
+
+from uuid6 import uuid7
 
 from app.application.ports import GridRepository, QuoteRepository
 from app.domain.errors import (
@@ -35,7 +40,7 @@ def _require_current_grid(grids: GridRepository) -> PriceGrid:
     return grid
 
 
-# ---------- Lecture ----------
+# ---------- Read ----------
 
 
 def get_current_grid(grids: GridRepository) -> PriceGrid:
@@ -60,7 +65,7 @@ def get_quote(quote_id: UUID, quotes: QuoteRepository) -> Quote:
     return quote
 
 
-# ---------- Calcul de prix ----------
+# ---------- Compute a quote ----------
 
 
 def compute_quote(
@@ -74,7 +79,7 @@ def compute_quote(
 
     rate = grid.find_rate(zone, mode)
     if rate is None:
-        # Distinguer zone inconnue vs. mode manquant pour cette zone.
+        # Distinguish an unknown zone from a missing mode for a known zone.
         zones_available = {r.zone for r in grid.rates}
         if zone not in zones_available:
             raise ZoneNotFound(zone)
@@ -95,7 +100,7 @@ def compute_quote(
     breakdown = {"zone": zone, "mode": mode.value, **breakdown}
 
     quote = Quote(
-        id=uuid4(),
+        id=uuid7(),
         grid_id=grid.id,
         zone=zone,
         mode=mode,
@@ -108,7 +113,7 @@ def compute_quote(
     return quote
 
 
-# ---------- Administration : chaque écriture crée une nouvelle grille ----------
+# ---------- Administration: every write publishes a new grid version ----------
 
 
 def _validate_rate_amount(hourly_rate_eur: Decimal) -> None:
@@ -156,7 +161,7 @@ def _new_grid_from(
     replace: dict[tuple[str, Mode], Decimal] | None = None,
     add: list[tuple[str, Mode, Decimal]] | None = None,
 ) -> PriceGrid:
-    new_id = uuid4()
+    new_id = uuid7()
     now = _now()
     return PriceGrid(
         id=new_id,

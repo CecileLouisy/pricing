@@ -1,4 +1,4 @@
-"""Endpoints de calcul et consultation des devis."""
+"""Quote computation and lookup endpoints."""
 
 from uuid import UUID
 
@@ -18,7 +18,7 @@ router = APIRouter(tags=["quotes"])
     "/quote",
     response_model=QuoteResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Calculer un prix et le persister",
+    summary="Compute and persist a quote",
 )
 def create_quote(
     body: QuoteRequest,
@@ -40,7 +40,7 @@ def create_quote(
 @router.get(
     "/quotes/{quote_id}",
     response_model=QuoteResponse,
-    summary="Retrouver un devis passé",
+    summary="Retrieve a past quote",
 )
 def get_quote(quote_id: UUID, session: Session = Depends(get_session)) -> QuoteResponse:
     quotes = SqlQuoteRepository(session)

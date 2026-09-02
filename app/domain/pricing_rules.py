@@ -1,7 +1,7 @@
-"""Règles pures de calcul du prix.
+"""Pure pricing rules.
 
-Ces fonctions ne dépendent de rien — pas de DB, pas de HTTP, pas de datetime.now.
-Elles sont directement testables unitairement.
+These functions depend on nothing — no database, no HTTP, no datetime.now.
+They are directly unit-testable.
 """
 
 import math
@@ -25,7 +25,7 @@ def compute_walk_in(
     free_period_min: int,
     hourly_rate_eur: Decimal,
 ) -> tuple[Decimal, dict]:
-    """Facturation au quart d'heure entamé, avec période initiale gratuite."""
+    """Charge every started quarter-hour, with a free initial period."""
     _validate_duration(duration_min)
     billable_min = max(0, duration_min - free_period_min)
     quarters = math.ceil(billable_min / 15)
@@ -45,7 +45,7 @@ def compute_reserved(
     duration_min: int,
     hourly_rate_eur: Decimal,
 ) -> tuple[Decimal, dict]:
-    """Facturation à l'heure pleine (durée garantie multiple de 60 par Booking)."""
+    """Charge full hours (duration is guaranteed to be a multiple of 60 by Booking)."""
     _validate_duration(duration_min)
     if duration_min % 60 != 0:
         raise InvalidDuration(

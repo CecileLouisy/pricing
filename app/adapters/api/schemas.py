@@ -1,4 +1,4 @@
-"""DTO Pydantic pour la couche HTTP (validation entrée + sérialisation sortie)."""
+"""Pydantic DTOs for the HTTP layer (input validation + output serialization)."""
 
 from datetime import datetime
 from decimal import Decimal

@@ -1,4 +1,4 @@
-"""Dépendances FastAPI — fournit une session DB par requête."""
+"""FastAPI dependencies — provides a per-request DB session."""
 
 from collections.abc import Iterator
 

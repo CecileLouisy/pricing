@@ -1,4 +1,4 @@
-"""Implémentation SQLAlchemy du port QuoteRepository."""
+"""SQLAlchemy implementation of the QuoteRepository port."""
 
 import json
 from uuid import UUID

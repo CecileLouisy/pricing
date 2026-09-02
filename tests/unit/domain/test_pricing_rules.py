@@ -1,4 +1,4 @@
-"""Tests unitaires des règles de calcul — cœur métier, sans DB ni HTTP."""
+"""Unit tests for the pricing rules — pure domain logic, no DB, no HTTP."""
 
 from decimal import Decimal
 
@@ -10,7 +10,7 @@ from app.domain.pricing_rules import compute_reserved, compute_walk_in
 
 class TestComputeWalkIn:
     def test_typical_case_75_minutes(self):
-        # 75 min - 15 gratuité = 60 min facturables = 4 quarts × 0.75€ = 3.00€
+        # 75 min - 15 free = 60 billable = 4 quarters x 0.75 EUR = 3.00 EUR
         amount, breakdown = compute_walk_in(75, free_period_min=15, hourly_rate_eur=Decimal("3.00"))
         assert amount == Decimal("3.00")
         assert breakdown["billable_min"] == 60
@@ -25,7 +25,7 @@ class TestComputeWalkIn:
         assert amount == Decimal("0.00")
 
     def test_started_quarter_is_due(self):
-        # 16 min - 15 gratuité = 1 min facturable → 1 quart entier dû = 0.75€
+        # 16 min - 15 free = 1 billable min -> 1 full quarter due = 0.75 EUR
         amount, breakdown = compute_walk_in(16, free_period_min=15, hourly_rate_eur=Decimal("3.00"))
         assert amount == Decimal("0.75")
         assert breakdown["quarters"] == 1

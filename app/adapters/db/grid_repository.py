@@ -1,4 +1,4 @@
-"""Implémentation SQLAlchemy du port GridRepository."""
+"""SQLAlchemy implementation of the GridRepository port."""
 
 from datetime import datetime, timezone
 from uuid import UUID
@@ -33,7 +33,7 @@ def _to_domain(row: GridORM) -> PriceGrid:
 
 
 class SqlGridRepository:
-    """Adapter SQLAlchemy — respecte le protocole GridRepository."""
+    """SQLAlchemy adapter — satisfies the GridRepository protocol."""
 
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -53,13 +53,13 @@ class SqlGridRepository:
         return [_to_domain(r) for r in rows]
 
     def publish(self, new_grid: PriceGrid) -> PriceGrid:
-        # 1. Fermer la grille actuelle (si présente).
+        # 1. Close the currently active grid (if any).
         current_stmt = select(GridORM).where(GridORM.effective_to.is_(None))
         current = self._session.execute(current_stmt).scalar_one_or_none()
         if current is not None:
             current.effective_to = datetime.now(timezone.utc)
 
-        # 2. Insérer la nouvelle grille et ses tarifs.
+        # 2. Insert the new grid and its rates.
         new_row = GridORM(
             id=str(new_grid.id),
             version=new_grid.version,

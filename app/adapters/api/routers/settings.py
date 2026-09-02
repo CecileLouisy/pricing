@@ -1,4 +1,4 @@
-"""Endpoint de consultation/modification de la période de gratuité initiale."""
+"""Free period lookup and update endpoints."""
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -15,7 +15,7 @@ router = APIRouter(tags=["settings"])
 @router.get(
     "/settings/free-period",
     response_model=FreePeriodResponse,
-    summary="Durée de gratuité initiale active",
+    summary="Active free initial period",
 )
 def get_free_period(session: Session = Depends(get_session)) -> FreePeriodResponse:
     grid = use_cases.get_current_grid(SqlGridRepository(session))
@@ -30,7 +30,7 @@ def get_free_period(session: Session = Depends(get_session)) -> FreePeriodRespon
     "/settings/free-period",
     response_model=FreePeriodResponse,
     dependencies=[Depends(require_admin)],
-    summary="Modifier la gratuité initiale (admin)",
+    summary="Update the free initial period (admin)",
 )
 def update_free_period(
     body: FreePeriodUpdateRequest,

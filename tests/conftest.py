@@ -1,4 +1,4 @@
-"""Configuration pytest globale — force un env de test avant tout import applicatif."""
+"""Global pytest configuration — force a test environment before app imports."""
 
 import os
 
