@@ -1,7 +1,7 @@
-"""Modèles SQLAlchemy — mapping tables ↔ objets.
+"""SQLAlchemy models — table ↔ object mapping.
 
-Ils vivent uniquement dans la couche adapters/db. Les repositories convertissent
-vers les entités du domaine avant d'exposer aux use cases.
+These live only in the adapters/db layer. Repositories convert to domain
+entities before exposing them to use cases.
 """
 
 from datetime import datetime

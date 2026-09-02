@@ -1,4 +1,4 @@
-"""Vérification simple du token admin (header X-Admin-Token)."""
+"""Simple admin token check (X-Admin-Token header)."""
 
 from fastapi import Header, HTTPException, status
 
@@ -6,7 +6,7 @@ from app.config import settings
 
 
 def require_admin(x_admin_token: str | None = Header(default=None)) -> None:
-    """Rejette toute requête sans header X-Admin-Token valide."""
+    """Reject any request that does not carry a valid X-Admin-Token header."""
     expected = settings.ADMIN_TOKEN
     if not x_admin_token or x_admin_token != expected:
         raise HTTPException(

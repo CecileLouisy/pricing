@@ -1,4 +1,4 @@
-"""Mapping des erreurs du domaine vers des réponses HTTP structurées."""
+"""Map domain errors to structured HTTP responses."""
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse

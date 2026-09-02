@@ -1,4 +1,4 @@
-"""Configuration SQLAlchemy et amorçage de la base."""
+"""SQLAlchemy setup and database bootstrap."""
 
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
+from uuid6 import uuid7
 
 from app.adapters.db.orm_models import Base, GridORM, RateORM
 from app.config import settings
@@ -21,7 +22,7 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expi
 
 
 def init_db() -> None:
-    """Crée les tables si absentes et amorce une grille initiale si base vide."""
+    """Create tables if missing and seed an initial grid if the database is empty."""
     Base.metadata.create_all(engine)
     with SessionLocal() as session:
         existing = session.execute(select(GridORM).limit(1)).first()
@@ -31,12 +32,13 @@ def init_db() -> None:
 
 
 def _seed_initial_grid(session: Session) -> None:
-    """Grille v1 : 5 zones × 2 modes, gratuité initiale de 15 min.
+    """Grid v1: 5 zones x 2 modes, initial free period of 60 minutes.
 
-    Les montants sont volontairement simples et modifiables ensuite par l'admin.
+    Amounts are intentionally simple and can be updated by an admin later.
+    Grid identifier uses UUIDv7 (time-ordered); rate identifiers use UUIDv4.
     """
     now = datetime.now(timezone.utc)
-    grid_id = str(uuid4())
+    grid_id = str(uuid7())
     grid = GridORM(
         id=grid_id,
         version=1,
@@ -47,7 +49,7 @@ def _seed_initial_grid(session: Session) -> None:
     )
     session.add(grid)
 
-    # Tarifs par défaut (EUR / heure). L'admin ajustera via PATCH ensuite.
+    # Default rates in EUR / hour. Admin can adjust via PATCH afterwards.
     defaults: dict[str, tuple[Decimal, Decimal]] = {
         # zone       : (walk_in, reserved)
         "standard":   (Decimal("3.00"), Decimal("2.50")),

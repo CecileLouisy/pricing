@@ -1,7 +1,7 @@
-"""Endpoints de consultation et modification des tarifs.
+"""Rate lookup and administration endpoints.
 
-Lectures publiques (grille active). Écritures protégées par X-Admin-Token.
-Chaque écriture crée automatiquement une nouvelle version de grille.
+Public reads (active grid). Writes protected by X-Admin-Token.
+Every write publishes a brand new grid version.
 """
 
 from fastapi import APIRouter, Depends, status
@@ -23,7 +23,7 @@ from app.domain.value_objects import Mode
 router = APIRouter(tags=["rates"])
 
 
-@router.get("/rates", response_model=list[RateResponse], summary="Tarifs de la grille active")
+@router.get("/rates", response_model=list[RateResponse], summary="Rates of the active grid")
 def list_rates(session: Session = Depends(get_session)) -> list[RateResponse]:
     grid = use_cases.get_current_grid(SqlGridRepository(session))
     return [RateResponse.from_domain(r) for r in grid.rates]
@@ -32,7 +32,7 @@ def list_rates(session: Session = Depends(get_session)) -> list[RateResponse]:
 @router.get(
     "/rates/{zone}",
     response_model=list[RateResponse],
-    summary="Tarifs (reserved et walk_in) d'une zone",
+    summary="Rates (reserved and walk_in) for a zone",
 )
 def get_rates_for_zone(zone: str, session: Session = Depends(get_session)) -> list[RateResponse]:
     grid = use_cases.get_current_grid(SqlGridRepository(session))
@@ -47,7 +47,7 @@ def get_rates_for_zone(zone: str, session: Session = Depends(get_session)) -> li
     response_model=GridResponse,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_admin)],
-    summary="Créer un nouveau tarif (admin)",
+    summary="Create a new rate (admin)",
 )
 def create_rate(
     body: RateCreateRequest,
@@ -62,7 +62,7 @@ def create_rate(
     "/rates/{zone}/{mode}",
     response_model=GridResponse,
     dependencies=[Depends(require_admin)],
-    summary="Modifier un tarif (admin)",
+    summary="Update a rate (admin)",
 )
 def update_rate(
     zone: str,

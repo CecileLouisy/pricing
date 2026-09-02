@@ -1,7 +1,7 @@
-"""Erreurs métier du domaine Pricing.
+"""Domain errors of the Pricing service.
 
-Chaque erreur porte un code stable exposé aux consommateurs de l'API.
-La couche adapters/api se charge de mapper chaque code sur un statut HTTP.
+Each error carries a stable code exposed to API consumers.
+The adapters/api layer maps every code to an HTTP status.
 """
 
 
