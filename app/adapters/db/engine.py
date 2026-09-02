@@ -40,7 +40,7 @@ def _seed_initial_grid(session: Session) -> None:
     grid = GridORM(
         id=grid_id,
         version=1,
-        free_period_min=15,
+        free_period_min=60,
         effective_from=now,
         effective_to=None,
         created_at=now,
