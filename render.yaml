@@ -14,6 +14,6 @@ services:
       - key: ADMIN_TOKEN
         generateValue: true
       - key: CORS_ORIGINS
-        value: "*"
+        value: "https://cecilelouisy.github.io"
       - key: LOG_LEVEL
         value: INFO
