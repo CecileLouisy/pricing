@@ -6,7 +6,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.adapters.api.error_handlers import register_error_handlers
-from app.adapters.api.routers import grids, health, quotes, rates, settings as settings_router
+from app.adapters.api.routers import grids, health, quotes, rates
+from app.adapters.api.routers import settings as settings_router
 from app.adapters.db.engine import init_db
 from app.config import settings
 

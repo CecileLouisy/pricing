@@ -1,6 +1,6 @@
 """SQLAlchemy setup and database bootstrap."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
@@ -37,7 +37,7 @@ def _seed_initial_grid(session: Session) -> None:
     Amounts are intentionally simple and can be updated by an admin later.
     Grid identifier uses UUIDv7 (time-ordered); rate identifiers use UUIDv4.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     grid_id = str(uuid7())
     grid = GridORM(
         id=grid_id,
@@ -52,10 +52,10 @@ def _seed_initial_grid(session: Session) -> None:
     # Default rates in EUR / hour. Admin can adjust via PATCH afterwards.
     defaults: dict[str, tuple[Decimal, Decimal]] = {
         # zone       : (walk_in, reserved)
-        "standard":   (Decimal("3.00"), Decimal("2.50")),
-        "xl":         (Decimal("4.50"), Decimal("4.00")),
-        "disabled":   (Decimal("1.50"), Decimal("1.25")),
-        "electric":   (Decimal("3.50"), Decimal("3.00")),
+        "standard": (Decimal("3.00"), Decimal("2.50")),
+        "xl": (Decimal("4.50"), Decimal("4.00")),
+        "disabled": (Decimal("1.50"), Decimal("1.25")),
+        "electric": (Decimal("3.50"), Decimal("3.00")),
         "two_wheels": (Decimal("1.00"), Decimal("0.80")),
     }
     for zone in INITIAL_ZONES:

@@ -1,9 +1,9 @@
 """Value types shared across the domain."""
 
-from enum import Enum
+from enum import StrEnum
 
 
-class Mode(str, Enum):
+class Mode(StrEnum):
     """Pricing context for a parking session."""
 
     RESERVED = "reserved"

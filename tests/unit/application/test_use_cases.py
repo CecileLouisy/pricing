@@ -1,6 +1,6 @@
 """Use case tests with in-memory repositories (no DB, no HTTP)."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -17,7 +17,6 @@ from app.domain.errors import (
 )
 from app.domain.models import PriceGrid, Quote, Rate
 from app.domain.value_objects import Mode
-
 
 # --------- Fake repositories ---------
 
@@ -49,7 +48,7 @@ class InMemoryGridRepo:
                 version=current.version,
                 free_period_min=current.free_period_min,
                 effective_from=current.effective_from,
-                effective_to=datetime.now(timezone.utc),
+                effective_to=datetime.now(UTC),
                 created_at=current.created_at,
                 rates=current.rates,
             )
@@ -73,7 +72,7 @@ class InMemoryQuoteRepo:
 
 
 def _make_grid() -> PriceGrid:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     grid_id = uuid7()
     rates = (
         Rate(uuid4(), grid_id, "standard", Mode.WALK_IN, Decimal("3.00")),

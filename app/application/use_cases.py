@@ -8,7 +8,7 @@ UUID convention:
   - Rate                → uuid4 (random, no time semantics)
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -30,7 +30,7 @@ from app.domain.value_objects import Mode
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _require_current_grid(grids: GridRepository) -> PriceGrid:
