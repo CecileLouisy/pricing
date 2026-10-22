@@ -1,11 +1,11 @@
 """Free period lookup and update endpoints."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.adapters.api.dependencies import get_session
 from app.adapters.api.schemas import FreePeriodResponse, FreePeriodUpdateRequest
-from app.adapters.api.security import require_admin
+from app.adapters.api.security import limiter, require_admin
 from app.adapters.db.grid_repository import SqlGridRepository
 from app.application import use_cases
 
@@ -32,7 +32,9 @@ def get_free_period(session: Session = Depends(get_session)) -> FreePeriodRespon
     dependencies=[Depends(require_admin)],
     summary="Update the free initial period (admin)",
 )
+@limiter.limit("10/minute")
 def update_free_period(
+    request: Request,
     body: FreePeriodUpdateRequest,
     session: Session = Depends(get_session),
 ) -> FreePeriodResponse:

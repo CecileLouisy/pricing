@@ -95,11 +95,16 @@ curl http://localhost:8000/quotes/{quote_id}
 
 ## Sécurité
 
-- Écritures protégées par header `X-Admin-Token` (env var).
-- Lectures publiques (grille, gratuité, historique) — utile pour un panneau d'affichage ou un site web du parking.
-- Validation stricte des entrées (Pydantic).
-- Anti-injection SQL garantie par SQLAlchemy.
-- CORS configurable via env var.
+| Couche | Mesure |
+|---|---|
+| Authentification | Écritures admin protégées par header `X-Admin-Token` (env var), comparaison en temps constant (`hmac.compare_digest`) |
+| Rate limiting | 10 requêtes/min par IP sur les endpoints admin (anti brute-force) |
+| Headers HTTP | `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `X-XSS-Protection`, `Referrer-Policy`, `Permissions-Policy` |
+| Validation | Entrées validées par Pydantic, anti-injection SQL par SQLAlchemy |
+| CORS | Restreint au domaine GitHub Pages (configurable via env var) |
+| Secrets | Token admin en variable d'environnement, jamais dans le code |
+
+Lectures publiques (grille, gratuité, historique) — utile pour un panneau d'affichage ou un site web du parking.
 
 ## Déploiement Render
 

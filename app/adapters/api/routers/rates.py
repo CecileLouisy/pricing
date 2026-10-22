@@ -4,7 +4,7 @@ Public reads (active grid). Writes protected by X-Admin-Token.
 Every write publishes a brand new grid version.
 """
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.orm import Session
 
 from app.adapters.api.dependencies import get_session
@@ -14,7 +14,7 @@ from app.adapters.api.schemas import (
     RateResponse,
     RateUpdateRequest,
 )
-from app.adapters.api.security import require_admin
+from app.adapters.api.security import limiter, require_admin
 from app.adapters.db.grid_repository import SqlGridRepository
 from app.application import use_cases
 from app.domain.errors import ZoneNotFound
@@ -49,7 +49,9 @@ def get_rates_for_zone(zone: str, session: Session = Depends(get_session)) -> li
     dependencies=[Depends(require_admin)],
     summary="Create a new rate (admin)",
 )
+@limiter.limit("10/minute")
 def create_rate(
+    request: Request,
     body: RateCreateRequest,
     session: Session = Depends(get_session),
 ) -> GridResponse:
@@ -64,7 +66,9 @@ def create_rate(
     dependencies=[Depends(require_admin)],
     summary="Update a rate (admin)",
 )
+@limiter.limit("10/minute")
 def update_rate(
+    request: Request,
     zone: str,
     mode: Mode,
     body: RateUpdateRequest,

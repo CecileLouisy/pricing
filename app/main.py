@@ -4,10 +4,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.adapters.api.error_handlers import register_error_handlers
 from app.adapters.api.routers import grids, health, quotes, rates
 from app.adapters.api.routers import settings as settings_router
+from app.adapters.api.security import limiter, security_headers_middleware
 from app.adapters.db.engine import init_db
 from app.config import settings
 
@@ -41,6 +44,9 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
@@ -48,6 +54,8 @@ app.add_middleware(
     allow_headers=["*"],
     allow_credentials=False,
 )
+
+app.middleware("http")(security_headers_middleware)
 
 register_error_handlers(app)
 
