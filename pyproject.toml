@@ -13,6 +13,7 @@ dependencies = [
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
     "uuid6>=2024.7",
+    "slowapi>=0.1.9",
 ]
 
 [project.optional-dependencies]
