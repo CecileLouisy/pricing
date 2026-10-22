@@ -28,6 +28,9 @@ Le domaine ne dépend de rien. Les adapters implémentent les ports définis dan
 - SQLite (persistance)
 - Pydantic v2 (validation)
 - pytest + httpx (tests)
+- ruff (linter + formatter)
+- pip-audit (audit de sécurité des dépendances)
+- radon (complexité cyclomatique)
 
 ## Démarrage local
 
@@ -54,13 +57,19 @@ Le service écoute sur http://localhost:8000.
 - **OpenAPI JSON** : http://localhost:8000/openapi.json
 - **Health** : http://localhost:8000/health
 
-Au premier démarrage, la base est créée et pré-remplie avec une grille tarifaire initiale (5 zones × 2 modes + gratuité de 15 min).
+Au premier démarrage, la base est créée et pré-remplie avec une grille tarifaire initiale (5 zones × 2 modes + gratuité de 60 min).
 
-## Tests
+## Tests & Qualité
 
 ```bash
-pytest
+pytest                            # tests unitaires + intégration
+ruff check app/ tests/            # linter (analyse statique)
+ruff format --check app/ tests/   # vérification du formatage
+pip-audit --skip-editable         # audit de sécurité des dépendances
+radon cc app/ -a -nc              # complexité cyclomatique (fail si > C)
 ```
+
+Ces vérifications sont aussi exécutées automatiquement par GitHub Actions à chaque push et PR sur master.
 
 ## Exemples d'appels
 
@@ -106,7 +115,7 @@ Voir la spec complète dans le Google Doc partagé avec le groupe.
 Résumé :
 - Grille tarifaire versionnée, chaque devis référence sa grille.
 - 5 zones (`standard`, `xl`, `disabled`, `electric`, `two_wheels`) × 2 modes (`reserved`, `walk_in`).
-- Walk-in facturé au quart d'heure entamé, gratuité initiale de 15 min.
+- Walk-in facturé au quart d'heure entamé, gratuité initiale de 60 min.
 - Réservation facturée à l'heure pleine, pas de gratuité.
 - Durée max 7 jours.
 - Devise unique : EUR.

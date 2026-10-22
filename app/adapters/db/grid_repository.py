@@ -1,6 +1,6 @@
 """SQLAlchemy implementation of the GridRepository port."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -57,7 +57,7 @@ class SqlGridRepository:
         current_stmt = select(GridORM).where(GridORM.effective_to.is_(None))
         current = self._session.execute(current_stmt).scalar_one_or_none()
         if current is not None:
-            current.effective_to = datetime.now(timezone.utc)
+            current.effective_to = datetime.now(UTC)
 
         # 2. Insert the new grid and its rates.
         new_row = GridORM(

@@ -9,7 +9,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.domain.models import PriceGrid, Quote, Rate
 from app.domain.value_objects import MAX_DURATION_MIN, Mode
 
-
 # --------- Requests ---------
 
 
