@@ -1,5 +1,6 @@
 """FastAPI entry point — application assembly."""
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -8,11 +9,18 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.adapters.api.error_handlers import register_error_handlers
+from app.adapters.api.request_logging import request_logging_middleware
 from app.adapters.api.routers import grids, health, quotes, rates
 from app.adapters.api.routers import settings as settings_router
 from app.adapters.api.security import limiter, security_headers_middleware
 from app.adapters.db.engine import init_db
 from app.config import settings
+from app.logging_config import configure_logging
+
+APP_VERSION = "1.0.0"
+
+configure_logging(settings.LOG_LEVEL)
+logger = logging.getLogger("pricing")
 
 API_DESCRIPTION = """
 Pricing service of the Parking Management project.
@@ -31,12 +39,14 @@ computation.
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
+    logger.info("event=startup version=%s env=%s", APP_VERSION, settings.ENV)
     yield
+    logger.info("event=shutdown")
 
 
 app = FastAPI(
     title="Pricing — Parking Management",
-    version="1.0.0",
+    version=APP_VERSION,
     description=API_DESCRIPTION,
     lifespan=lifespan,
     docs_url="/docs",
@@ -56,6 +66,8 @@ app.add_middleware(
 )
 
 app.middleware("http")(security_headers_middleware)
+# Registered last so it wraps every other middleware and sees the final status.
+app.middleware("http")(request_logging_middleware)
 
 register_error_handlers(app)
 

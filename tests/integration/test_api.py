@@ -152,3 +152,40 @@ class TestSettings:
         assert r.status_code == 200
         assert r.json()["free_period_min"] == 30
         assert r.json()["grid_version"] == 2
+
+
+class TestLogging:
+    def test_quote_logs_business_event_and_request(self, client, caplog):
+        caplog.set_level("INFO")
+        r = client.post(
+            "/quote",
+            json={"zone": "standard", "mode": "walk_in", "duration_min": 75},
+        )
+        quote_id = r.json()["quote_id"]
+        assert f"event=quote_computed quote_id={quote_id}" in caplog.text
+        assert "amount_eur=0.75" in caplog.text
+        assert "event=http_request method=POST path=/quote status=201" in caplog.text
+
+    def test_grid_publication_is_logged(self, client, caplog):
+        caplog.set_level("INFO")
+        client.patch(
+            "/settings/free-period",
+            headers={"X-Admin-Token": "test-token"},
+            json={"free_period_min": 30},
+        )
+        assert "event=grid_published change=free_period_updated version=2" in caplog.text
+
+    def test_domain_error_is_logged_as_warning(self, client, caplog):
+        client.post("/quote", json={"zone": "nope", "mode": "walk_in", "duration_min": 30})
+        record = next(r for r in caplog.records if "event=domain_error" in r.getMessage())
+        assert record.levelname == "WARNING"
+        assert "code=ZONE_NOT_FOUND" in record.getMessage()
+
+    def test_failed_admin_auth_is_logged_without_token(self, client, caplog):
+        client.patch(
+            "/settings/free-period",
+            headers={"X-Admin-Token": "wrong-secret"},
+            json={"free_period_min": 30},
+        )
+        assert "event=admin_auth_failed reason=invalid_token" in caplog.text
+        assert "wrong-secret" not in caplog.text

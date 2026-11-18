@@ -1,6 +1,7 @@
 """Security utilities — admin auth, headers, rate limiting."""
 
 import hmac
+import logging
 
 from fastapi import Header, HTTPException, Request, Response, status
 from slowapi import Limiter
@@ -10,11 +11,19 @@ from app.config import settings
 
 limiter = Limiter(key_func=get_remote_address)
 
+logger = logging.getLogger("pricing.security")
 
-def require_admin(x_admin_token: str | None = Header(default=None)) -> None:
+
+def require_admin(request: Request, x_admin_token: str | None = Header(default=None)) -> None:
     """Reject any request that does not carry a valid X-Admin-Token header."""
     expected = settings.ADMIN_TOKEN
     if not x_admin_token or not hmac.compare_digest(x_admin_token, expected):
+        logger.warning(
+            "event=admin_auth_failed reason=%s method=%s path=%s",
+            "missing_token" if not x_admin_token else "invalid_token",
+            request.method,
+            request.url.path,
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"code": "UNAUTHORIZED", "message": "Missing or invalid X-Admin-Token"},
