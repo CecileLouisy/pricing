@@ -8,6 +8,7 @@ UUID convention:
   - Rate                → uuid4 (random, no time semantics)
 """
 
+import logging
 from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -27,6 +28,8 @@ from app.domain.errors import (
 from app.domain.models import PriceGrid, Quote, Rate
 from app.domain.pricing_rules import compute_reserved, compute_walk_in
 from app.domain.value_objects import Mode
+
+logger = logging.getLogger("pricing.business")
 
 
 def _now() -> datetime:
@@ -110,6 +113,15 @@ def compute_quote(
         computed_at=_now(),
     )
     quotes.save(quote)
+    logger.info(
+        "event=quote_computed quote_id=%s grid_version=%d zone=%s mode=%s duration_min=%d amount_eur=%s",
+        quote.id,
+        grid.version,
+        zone,
+        mode.value,
+        duration_min,
+        amount,
+    )
     return quote
 
 
@@ -188,7 +200,16 @@ def update_rate(
             raise ZoneNotFound(zone)
         raise ModeNotFound(f"mode '{mode.value}' not defined for zone '{zone}'")
     new_grid = _new_grid_from(current, replace={(zone, mode): new_hourly_rate_eur})
-    return grids.publish(new_grid)
+    published = grids.publish(new_grid)
+    logger.info(
+        "event=grid_published change=rate_updated version=%d previous_version=%d zone=%s mode=%s hourly_rate_eur=%s",
+        published.version,
+        current.version,
+        zone,
+        mode.value,
+        new_hourly_rate_eur,
+    )
+    return published
 
 
 def create_rate(
@@ -202,7 +223,16 @@ def create_rate(
     if current.find_rate(zone, mode) is not None:
         raise RateAlreadyExists(f"rate already exists for ({zone}, {mode.value})")
     new_grid = _new_grid_from(current, add=[(zone, mode, hourly_rate_eur)])
-    return grids.publish(new_grid)
+    published = grids.publish(new_grid)
+    logger.info(
+        "event=grid_published change=rate_created version=%d previous_version=%d zone=%s mode=%s hourly_rate_eur=%s",
+        published.version,
+        current.version,
+        zone,
+        mode.value,
+        hourly_rate_eur,
+    )
+    return published
 
 
 def update_free_period(
@@ -213,4 +243,11 @@ def update_free_period(
         raise InvalidFreePeriod(f"free_period_min must be >= 0, got {new_free_period_min}")
     current = _require_current_grid(grids)
     new_grid = _new_grid_from(current, free_period_min=new_free_period_min)
-    return grids.publish(new_grid)
+    published = grids.publish(new_grid)
+    logger.info(
+        "event=grid_published change=free_period_updated version=%d previous_version=%d free_period_min=%d",
+        published.version,
+        current.version,
+        new_free_period_min,
+    )
+    return published
