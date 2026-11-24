@@ -8,16 +8,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+from app import __version__
 from app.adapters.api.error_handlers import register_error_handlers
 from app.adapters.api.request_logging import request_logging_middleware
-from app.adapters.api.routers import grids, health, quotes, rates
+from app.adapters.api.routers import grids, health, quotes, rates, root
 from app.adapters.api.routers import settings as settings_router
 from app.adapters.api.security import limiter, security_headers_middleware
 from app.adapters.db.engine import init_db
 from app.config import settings
 from app.logging_config import configure_logging
-
-APP_VERSION = "1.0.0"
 
 configure_logging(settings.LOG_LEVEL)
 logger = logging.getLogger("pricing")
@@ -39,14 +38,14 @@ computation.
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
-    logger.info("event=startup version=%s env=%s", APP_VERSION, settings.ENV)
+    logger.info("event=startup version=%s env=%s", __version__, settings.ENV)
     yield
     logger.info("event=shutdown")
 
 
 app = FastAPI(
     title="Pricing — Parking Management",
-    version=APP_VERSION,
+    version=__version__,
     description=API_DESCRIPTION,
     lifespan=lifespan,
     docs_url="/docs",
@@ -71,6 +70,7 @@ app.middleware("http")(request_logging_middleware)
 
 register_error_handlers(app)
 
+app.include_router(root.router)
 app.include_router(health.router)
 app.include_router(quotes.router)
 app.include_router(rates.router)

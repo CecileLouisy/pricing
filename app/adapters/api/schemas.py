@@ -120,6 +120,13 @@ class FreePeriodResponse(BaseModel):
     grid_version: int
 
 
+class RootResponse(BaseModel):
+    service: str = "pricing"
+    version: str
+    docs: str = "/docs"
+    health: str = "/health"
+
+
 class HealthResponse(BaseModel):
     status: str = "ok"
     service: str = "pricing"
