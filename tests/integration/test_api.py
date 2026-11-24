@@ -33,6 +33,21 @@ class TestHealth:
         assert r.status_code == 200
         assert r.json() == {"status": "ok", "service": "pricing"}
 
+    def test_root_identifies_service(self, client):
+        r = client.get("/")
+        assert r.status_code == 200
+        assert r.json() == {
+            "service": "pricing",
+            "version": "1.0.0",
+            "docs": "/docs",
+            "health": "/health",
+        }
+
+    def test_root_answers_head_probe(self, client):
+        r = client.head("/")
+        assert r.status_code == 200
+        assert r.content == b""
+
 
 class TestQuote:
     def test_walk_in_computes_price(self, client):

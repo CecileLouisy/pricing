@@ -56,6 +56,7 @@ Le service écoute sur http://localhost:8000.
 - **ReDoc** : http://localhost:8000/redoc
 - **OpenAPI JSON** : http://localhost:8000/openapi.json
 - **Health** : http://localhost:8000/health
+- **Racine** : http://localhost:8000/ (nom du service, version, liens vers `/docs` et `/health`)
 
 Au premier démarrage, la base est créée et pré-remplie avec une grille tarifaire initiale (5 zones × 2 modes + gratuité de 60 min).
 
