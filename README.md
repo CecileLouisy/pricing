@@ -106,6 +106,27 @@ curl http://localhost:8000/quotes/{quote_id}
 
 Lectures publiques (grille, gratuité, historique) — utile pour un panneau d'affichage ou un site web du parking.
 
+## Logs
+
+Une ligne par événement sur stdout, au format `clé=valeur` (lisible dans les logs Render et facile à filtrer). Niveau réglable via la variable d'environnement `LOG_LEVEL` (défaut `INFO`).
+
+| Logger | Événement | Niveau | Contenu |
+|---|---|---|---|
+| `pricing` | `startup` / `shutdown` | INFO | version, environnement |
+| `pricing.http` | `http_request` | INFO (2xx/3xx), WARNING (4xx), ERROR (5xx) | méthode, route, statut, durée en ms |
+| `pricing.business` | `quote_computed` | INFO | quote_id, version de grille, zone, mode, durée, montant |
+| `pricing.business` | `grid_published` | INFO | type de changement, nouvelle et ancienne version, valeur modifiée |
+| `pricing.errors` | `domain_error` | WARNING | code d'erreur métier, route |
+| `pricing.errors` | `unexpected_error` | ERROR | stack trace complète (le client reçoit seulement un message générique) |
+| `pricing.security` | `admin_auth_failed` | WARNING | raison (`missing_token` / `invalid_token`), route — **le jeton n'est jamais loggé** |
+
+Exemple :
+
+```
+2026-11-18 09:13:20,498 level=INFO logger=pricing.business event=quote_computed quote_id=01a1edb7-... grid_version=1 zone=standard mode=walk_in duration_min=75 amount_eur=0.75
+2026-11-18 09:13:20,499 level=INFO logger=pricing.http event=http_request method=POST path=/quote status=201 duration_ms=10.2
+```
+
 ## Déploiement Render
 
 Le fichier `render.yaml` déclare le service. Sur Render :
