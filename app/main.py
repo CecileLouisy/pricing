@@ -14,8 +14,11 @@ from app.adapters.api.request_logging import request_logging_middleware
 from app.adapters.api.routers import grids, health, quotes, rates, root
 from app.adapters.api.routers import settings as settings_router
 from app.adapters.api.security import limiter, security_headers_middleware
-from app.adapters.db.engine import init_db
+from app.adapters.db.engine import SessionLocal, init_db
+from app.adapters.db.grid_repository import SqlGridRepository
+from app.application import use_cases
 from app.config import settings
+from app.domain.value_objects import ZONE_RENAMES
 from app.logging_config import configure_logging
 
 configure_logging(settings.LOG_LEVEL)
@@ -38,6 +41,10 @@ computation.
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
+    with SessionLocal() as session:
+        grids = SqlGridRepository(session)
+        for old_zone, new_zone in ZONE_RENAMES.items():
+            use_cases.rename_zone(old_zone, new_zone, grids)
     logger.info("event=startup version=%s env=%s", __version__, settings.ENV)
     yield
     logger.info("event=shutdown")

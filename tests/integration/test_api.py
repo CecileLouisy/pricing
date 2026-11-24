@@ -9,8 +9,10 @@ os.environ["DATABASE_URL"] = "sqlite:///./test_pricing.db"
 os.environ["ADMIN_TOKEN"] = "test-token"
 
 from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy import update  # noqa: E402
 
-from app.adapters.db.engine import Base, engine, init_db  # noqa: E402
+from app.adapters.db.engine import Base, SessionLocal, engine, init_db  # noqa: E402
+from app.adapters.db.orm_models import RateORM  # noqa: E402
 from app.main import app  # noqa: E402
 
 
@@ -167,6 +169,48 @@ class TestSettings:
         assert r.status_code == 200
         assert r.json()["free_period_min"] == 30
         assert r.json()["grid_version"] == 2
+
+
+class TestParkingCategoryCodes:
+    def test_seed_uses_parking_category_codes(self, client):
+        zones = {r["zone"] for r in client.get("/rates").json()}
+        assert zones == {"standard", "handicapped", "electric", "xl", "two_wheels"}
+
+    def test_quote_accepts_uppercase_parking_code(self, client):
+        r = client.post(
+            "/quote",
+            json={"zone": "HANDICAPPED", "mode": "walk_in", "duration_min": 120},
+        )
+        assert r.status_code == 201
+        assert r.json()["breakdown"]["zone"] == "handicapped"
+
+    def test_former_code_is_no_longer_accepted(self, client):
+        r = client.post(
+            "/quote",
+            json={"zone": "disabled", "mode": "walk_in", "duration_min": 120},
+        )
+        assert r.status_code == 404
+        assert r.json()["code"] == "ZONE_NOT_FOUND"
+
+    def test_rates_by_zone_is_case_insensitive(self, client):
+        r = client.get("/rates/TWO_WHEELS")
+        assert r.status_code == 200
+        assert len(r.json()) == 2
+
+    def test_startup_renames_legacy_zone_in_a_new_grid(self):
+        with SessionLocal() as session:
+            session.execute(
+                update(RateORM).where(RateORM.zone == "handicapped").values(zone="disabled")
+            )
+            session.commit()
+
+        with TestClient(app) as started:
+            grid = started.get("/grids/current").json()
+            zones = {r["zone"] for r in grid["rates"]}
+            assert grid["version"] == 2
+            assert "handicapped" in zones
+            assert "disabled" not in zones
+            assert started.get("/grids").json()[-1]["version"] == 1
 
 
 class TestLogging:
