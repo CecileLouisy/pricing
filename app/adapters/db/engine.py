@@ -60,7 +60,7 @@ def _seed_initial_grid(session: Session) -> None:
         # zone       : (walk_in, reserved)
         "standard": (Decimal("3.00"), Decimal("2.50")),
         "xl": (Decimal("4.50"), Decimal("4.00")),
-        "disabled": (Decimal("1.50"), Decimal("1.25")),
+        "handicapped": (Decimal("1.50"), Decimal("1.25")),
         "electric": (Decimal("3.50"), Decimal("3.00")),
         "two_wheels": (Decimal("1.00"), Decimal("0.80")),
     }

@@ -8,6 +8,7 @@ UUID convention:
   - Rate                → uuid4 (random, no time semantics)
 """
 
+import dataclasses
 import logging
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -27,7 +28,7 @@ from app.domain.errors import (
 )
 from app.domain.models import PriceGrid, Quote, Rate
 from app.domain.pricing_rules import compute_reserved, compute_walk_in
-from app.domain.value_objects import Mode
+from app.domain.value_objects import Mode, normalize_zone
 
 logger = logging.getLogger("pricing.business")
 
@@ -78,6 +79,7 @@ def compute_quote(
     grids: GridRepository,
     quotes: QuoteRepository,
 ) -> Quote:
+    zone = normalize_zone(zone)
     grid = _require_current_grid(grids)
 
     rate = grid.find_rate(zone, mode)
@@ -192,6 +194,7 @@ def update_rate(
     new_hourly_rate_eur: Decimal,
     grids: GridRepository,
 ) -> PriceGrid:
+    zone = normalize_zone(zone)
     _validate_rate_amount(new_hourly_rate_eur)
     current = _require_current_grid(grids)
     if current.find_rate(zone, mode) is None:
@@ -218,6 +221,7 @@ def create_rate(
     hourly_rate_eur: Decimal,
     grids: GridRepository,
 ) -> PriceGrid:
+    zone = normalize_zone(zone)
     _validate_rate_amount(hourly_rate_eur)
     current = _require_current_grid(grids)
     if current.find_rate(zone, mode) is not None:
@@ -249,5 +253,31 @@ def update_free_period(
         published.version,
         current.version,
         new_free_period_min,
+    )
+    return published
+
+
+def rename_zone(old_zone: str, new_zone: str, grids: GridRepository) -> PriceGrid | None:
+    """Publish a new grid where old_zone is renamed; past grids and quotes keep the old code.
+
+    Returns None when old_zone is not in the active grid, so it can safely run at every startup.
+    """
+    current = _require_current_grid(grids)
+    zones = {r.zone for r in current.rates}
+    if old_zone not in zones:
+        return None
+    if new_zone in zones:
+        raise RateAlreadyExists(f"zone '{new_zone}' already exists, cannot rename '{old_zone}'")
+    new_grid = _new_grid_from(current)
+    renamed = tuple(
+        dataclasses.replace(r, zone=new_zone) if r.zone == old_zone else r for r in new_grid.rates
+    )
+    published = grids.publish(dataclasses.replace(new_grid, rates=renamed))
+    logger.info(
+        "event=grid_published change=zone_renamed version=%d previous_version=%d from=%s to=%s",
+        published.version,
+        current.version,
+        old_zone,
+        new_zone,
     )
     return published

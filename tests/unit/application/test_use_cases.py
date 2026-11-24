@@ -118,6 +118,10 @@ class TestComputeQuote:
         with pytest.raises(ZoneNotFound):
             use_cases.compute_quote("moon_base", Mode.WALK_IN, 60, grids, quotes)
 
+    def test_zone_code_is_case_insensitive(self, grids, quotes):
+        quote = use_cases.compute_quote(" STANDARD ", Mode.WALK_IN, 75, grids, quotes)
+        assert quote.zone == "standard"
+
     def test_no_active_grid_raises(self, quotes):
         empty = InMemoryGridRepo()
         with pytest.raises(GridNotFound):
@@ -178,3 +182,23 @@ class TestUpdateFreePeriod:
         new_grid = use_cases.update_free_period(30, grids)
         assert new_grid.free_period_min == 30
         assert new_grid.version == v1.version + 1
+
+
+class TestRenameZone:
+    def test_publishes_new_grid_with_renamed_zone(self, grids):
+        v1 = grids.get_current()
+        new_grid = use_cases.rename_zone("xl", "extra_large", grids)
+        assert new_grid.version == v1.version + 1
+        assert new_grid.find_rate("extra_large", Mode.WALK_IN).hourly_rate_eur == Decimal("4.50")
+        assert new_grid.find_rate("xl", Mode.WALK_IN) is None
+        # The previous grid keeps the old code for traceability.
+        assert grids.get_by_id(v1.id).find_rate("xl", Mode.WALK_IN) is not None
+
+    def test_does_nothing_when_zone_is_absent(self, grids):
+        v1 = grids.get_current()
+        assert use_cases.rename_zone("disabled", "handicapped", grids) is None
+        assert grids.get_current().version == v1.version
+
+    def test_rejects_existing_target(self, grids):
+        with pytest.raises(RateAlreadyExists):
+            use_cases.rename_zone("xl", "standard", grids)

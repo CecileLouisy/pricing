@@ -18,7 +18,7 @@ from app.adapters.api.security import limiter, require_admin
 from app.adapters.db.grid_repository import SqlGridRepository
 from app.application import use_cases
 from app.domain.errors import ZoneNotFound
-from app.domain.value_objects import Mode
+from app.domain.value_objects import Mode, normalize_zone
 
 router = APIRouter(tags=["rates"])
 
@@ -35,6 +35,7 @@ def list_rates(session: Session = Depends(get_session)) -> list[RateResponse]:
     summary="Rates (reserved and walk_in) for a zone",
 )
 def get_rates_for_zone(zone: str, session: Session = Depends(get_session)) -> list[RateResponse]:
+    zone = normalize_zone(zone)
     grid = use_cases.get_current_grid(SqlGridRepository(session))
     rates = [r for r in grid.rates if r.zone == zone]
     if not rates:

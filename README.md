@@ -152,7 +152,9 @@ Voir la spec complète dans le Google Doc partagé avec le groupe.
 
 Résumé :
 - Grille tarifaire versionnée, chaque devis référence sa grille.
-- 5 zones (`standard`, `xl`, `disabled`, `electric`, `two_wheels`) × 2 modes (`reserved`, `walk_in`).
+- 5 zones alignées sur les catégories du service Parking (`standard`, `handicapped`, `electric`, `xl`, `two_wheels`) × 2 modes (`reserved`, `walk_in`).
+- Codes de zone insensibles à la casse : `HANDICAPPED` (format Parking) et `handicapped` sont équivalents.
+- Si Parking renomme une catégorie, ajouter `"ancien": "nouveau"` dans `ZONE_RENAMES` (`app/domain/value_objects.py`) : au démarrage suivant, une nouvelle version de grille est publiée avec le nouveau code, les grilles et devis passés gardent l'ancien.
 - Walk-in facturé au quart d'heure entamé, gratuité initiale de 60 min.
 - Réservation facturée à l'heure pleine, pas de gratuité.
 - Durée max 7 jours.
