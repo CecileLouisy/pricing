@@ -12,10 +12,16 @@ from app.adapters.db.orm_models import Base, GridORM, RateORM
 from app.config import settings
 from app.domain.value_objects import INITIAL_ZONES, Mode
 
+_IS_SQLITE = settings.sqlalchemy_database_url.startswith("sqlite")
+
 engine = create_engine(
-    settings.DATABASE_URL,
+    settings.sqlalchemy_database_url,
     echo=False,
-    connect_args={"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {},
+    connect_args={"check_same_thread": False} if _IS_SQLITE else {},
+    # Neon suspends idle databases and closes their connections: test each pooled
+    # connection before use and recycle it before the server-side timeout.
+    pool_pre_ping=not _IS_SQLITE,
+    pool_recycle=300,
 )
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)

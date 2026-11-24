@@ -9,8 +9,9 @@ services:
     envVars:
       - key: ENV
         value: production
+      # Neon PostgreSQL connection string, contains the password: set in the dashboard.
       - key: DATABASE_URL
-        value: sqlite:///./pricing.db
+        sync: false
       - key: ADMIN_TOKEN
         generateValue: true
       - key: CORS_ORIGINS
