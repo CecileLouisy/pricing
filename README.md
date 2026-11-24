@@ -25,7 +25,7 @@ Le domaine ne dépend de rien. Les adapters implémentent les ports définis dan
 - Python 3.11
 - FastAPI (HTTP + OpenAPI auto)
 - SQLAlchemy 2.0 (ORM)
-- SQLite (persistance)
+- PostgreSQL hébergé sur [Neon](https://neon.com) en production (driver psycopg 3), SQLite en développement local et pour les tests
 - Pydantic v2 (validation)
 - pytest + httpx (tests)
 - ruff (linter + formatter)
@@ -127,12 +127,23 @@ Exemple :
 2026-11-18 09:13:20,499 level=INFO logger=pricing.http event=http_request method=POST path=/quote status=201 duration_ms=10.2
 ```
 
+## Base de données (Neon)
+
+Le disque d'un service Render gratuit est éphémère : une base SQLite y serait remise à zéro à chaque redémarrage. En production, les données sont donc stockées dans une base **PostgreSQL hébergée sur Neon**, ce qui conserve grilles et devis entre les déploiements.
+
+1. Créer un projet sur [neon.com](https://neon.com), de préférence dans la même région que le service Render.
+2. Copier la chaîne de connexion (*Connect* → connexion directe, sans `-pooler`), de la forme `postgresql://user:password@ep-xxx.<region>.aws.neon.tech/neondb?sslmode=require`.
+3. La coller dans la variable d'environnement `DATABASE_URL` du service Render.
+
+Le préfixe `postgresql://` est converti automatiquement vers le driver psycopg 3 (`app/config.py`). Au premier démarrage, les tables sont créées et la grille initiale est insérée ; les démarrages suivants réutilisent les données existantes.
+
 ## Déploiement Render
 
 Le fichier `render.yaml` déclare le service. Sur Render :
 1. Nouveau *Web Service* → connecter le repo GitHub → détection auto de `render.yaml`.
-2. Deploy.
-3. Le token admin est généré automatiquement (visible dans les env vars du dashboard Render).
+2. Renseigner `DATABASE_URL` (chaîne de connexion Neon, voir ci-dessus).
+3. Deploy.
+4. Le token admin est généré automatiquement (visible dans les env vars du dashboard Render).
 
 ## Périmètre
 

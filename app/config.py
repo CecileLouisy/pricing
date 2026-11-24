@@ -13,6 +13,16 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     @property
+    def sqlalchemy_database_url(self) -> str:
+        # Neon (and most providers) hand out "postgresql://" URLs; SQLAlchemy would
+        # then pick psycopg2, which is not installed. Point it at psycopg 3 instead.
+        url = self.DATABASE_URL
+        for prefix in ("postgres://", "postgresql://"):
+            if url.startswith(prefix):
+                return "postgresql+psycopg://" + url.removeprefix(prefix)
+        return url
+
+    @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
 
