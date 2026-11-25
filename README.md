@@ -177,6 +177,8 @@ Choix de conception :
 - les appels à `/metrics` sont loggés en DEBUG, pour ne pas noyer les logs d'une ligne toutes les 15 s ;
 - `/metrics` est public, comme `/health` : il ne contient aucune donnée personnelle ni aucun secret.
 
+Un Prometheus et un Grafana locaux, avec un tableau de bord prêt à l'emploi, sont fournis dans [`monitoring/`](monitoring/README.md) (`docker compose up -d`, puis http://localhost:3000).
+
 Exemples de requêtes PromQL :
 
 ```promql
