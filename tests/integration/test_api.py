@@ -10,6 +10,7 @@ os.environ["DATABASE_URL"] = "sqlite:///./test_pricing.db"
 os.environ["ADMIN_TOKEN"] = "test-token"
 
 from fastapi.testclient import TestClient  # noqa: E402
+from prometheus_client import REGISTRY  # noqa: E402
 from sqlalchemy import inspect, text, update  # noqa: E402
 
 from app.adapters.db.engine import Base, SessionLocal, engine, init_db  # noqa: E402
@@ -334,3 +335,84 @@ class TestCorrelationId:
         init_db()
         columns = {c["name"] for c in inspect(engine).get_columns("quote")}
         assert "correlation_id" in columns
+
+
+def _sample(name, labels=None):
+    return REGISTRY.get_sample_value(name, labels or {}) or 0.0
+
+
+class TestMetrics:
+    def test_endpoint_uses_prometheus_text_format(self, client):
+        r = client.get("/metrics")
+        assert r.status_code == 200
+        assert r.headers["content-type"].startswith("text/plain")
+        assert "# TYPE pricing_http_requests_total counter" in r.text
+        assert 'pricing_build_info{version="1.0.0"} 1.0' in r.text
+
+    def test_quote_increments_business_and_http_metrics(self, client):
+        quotes = {"zone": "standard", "mode": "walk_in"}
+        http = {"method": "POST", "route": "/quote", "status": "201"}
+        quotes_before = _sample("pricing_quotes_computed_total", quotes)
+        http_before = _sample("pricing_http_requests_total", http)
+        duration_before = _sample(
+            "pricing_http_request_duration_seconds_count", {"method": "POST", "route": "/quote"}
+        )
+        client.post("/quote", json={"zone": "STANDARD", "mode": "walk_in", "duration_min": 75})
+        assert _sample("pricing_quotes_computed_total", quotes) == quotes_before + 1
+        assert _sample("pricing_http_requests_total", http) == http_before + 1
+        assert (
+            _sample(
+                "pricing_http_request_duration_seconds_count",
+                {"method": "POST", "route": "/quote"},
+            )
+            == duration_before + 1
+        )
+
+    def test_route_template_is_used_not_raw_path(self, client):
+        created = client.post(
+            "/quote", json={"zone": "standard", "mode": "walk_in", "duration_min": 75}
+        ).json()
+        client.get(f"/quotes/{created['quote_id']}")
+        client.get("/v2/pricing/metrics")
+        text_out = client.get("/metrics").text
+        assert 'route="/quotes/{quote_id}"' in text_out
+        assert created["quote_id"] not in text_out
+        assert 'route="unmatched",status="404"' in text_out
+        assert "/v2/pricing/metrics" not in text_out
+
+    def test_domain_error_is_counted_by_code(self, client):
+        labels = {"code": "ZONE_NOT_FOUND"}
+        before = _sample("pricing_domain_errors_total", labels)
+        client.post("/quote", json={"zone": "nope", "mode": "walk_in", "duration_min": 30})
+        assert _sample("pricing_domain_errors_total", labels) == before + 1
+
+    def test_grid_publication_updates_counter_and_active_version(self, client):
+        labels = {"change": "free_period_updated"}
+        before = _sample("pricing_grid_publications_total", labels)
+        client.patch(
+            "/settings/free-period",
+            headers={"X-Admin-Token": "test-token"},
+            json={"free_period_min": 30},
+        )
+        assert _sample("pricing_grid_publications_total", labels) == before + 1
+        assert _sample("pricing_active_grid_version") == 2
+
+    def test_admin_auth_failure_is_counted(self, client):
+        labels = {"reason": "invalid_token"}
+        before = _sample("pricing_admin_auth_failures_total", labels)
+        client.patch(
+            "/settings/free-period",
+            headers={"X-Admin-Token": "wrong"},
+            json={"free_period_min": 30},
+        )
+        assert _sample("pricing_admin_auth_failures_total", labels) == before + 1
+
+    def test_active_grid_version_is_set_at_startup(self):
+        with TestClient(app) as client:
+            client.get("/health")
+        assert _sample("pricing_active_grid_version") == 1
+
+    def test_scrapes_are_not_logged_at_info(self, client, caplog):
+        caplog.set_level("INFO")
+        client.get("/metrics")
+        assert "path=/metrics" not in caplog.text

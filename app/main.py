@@ -8,11 +8,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from app import __version__
+from app import __version__, metrics
 from app.adapters.api.correlation_middleware import correlation_id_middleware
 from app.adapters.api.error_handlers import register_error_handlers
 from app.adapters.api.request_logging import request_logging_middleware
 from app.adapters.api.routers import grids, health, quotes, rates, root
+from app.adapters.api.routers import metrics as metrics_router
 from app.adapters.api.routers import settings as settings_router
 from app.adapters.api.security import limiter, security_headers_middleware
 from app.adapters.db.engine import SessionLocal, init_db
@@ -47,6 +48,7 @@ async def lifespan(_app: FastAPI):
         grids = SqlGridRepository(session)
         for old_zone, new_zone in ZONE_RENAMES.items():
             use_cases.rename_zone(old_zone, new_zone, grids)
+        metrics.set_active_grid_version(use_cases.get_current_grid(grids).version)
     logger.info("event=startup version=%s env=%s", __version__, settings.ENV)
     yield
     logger.info("event=shutdown")
@@ -85,6 +87,7 @@ register_error_handlers(app)
 
 app.include_router(root.router)
 app.include_router(health.router)
+app.include_router(metrics_router.router)
 app.include_router(quotes.router)
 app.include_router(rates.router)
 app.include_router(grids.router)

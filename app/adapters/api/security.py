@@ -7,6 +7,7 @@ from fastapi import Header, HTTPException, Request, Response, status
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from app import metrics
 from app.config import settings
 
 limiter = Limiter(key_func=get_remote_address)
@@ -18,12 +19,14 @@ def require_admin(request: Request, x_admin_token: str | None = Header(default=N
     """Reject any request that does not carry a valid X-Admin-Token header."""
     expected = settings.ADMIN_TOKEN
     if not x_admin_token or not hmac.compare_digest(x_admin_token, expected):
+        reason = "missing_token" if not x_admin_token else "invalid_token"
         logger.warning(
             "event=admin_auth_failed reason=%s method=%s path=%s",
-            "missing_token" if not x_admin_token else "invalid_token",
+            reason,
             request.method,
             request.url.path,
         )
+        metrics.record_admin_auth_failure(reason)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"code": "UNAUTHORIZED", "message": "Missing or invalid X-Admin-Token"},

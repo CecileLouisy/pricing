@@ -27,6 +27,7 @@ Le domaine ne dépend de rien. Les adapters implémentent les ports définis dan
 - SQLAlchemy 2.0 (ORM)
 - PostgreSQL hébergé sur [Neon](https://neon.com) en production (driver psycopg 3), SQLite en développement local et pour les tests
 - Pydantic v2 (validation)
+- prometheus-client (métriques `/metrics`)
 - pytest + httpx (tests)
 - ruff (linter + formatter)
 - pip-audit (audit de sécurité des dépendances)
@@ -149,6 +150,44 @@ curl -i -X POST https://pricing-9khk.onrender.com/quote \
      -H "Content-Type: application/json" \
      -H "X-Correlation-ID: booking-42" \
      -d '{"zone":"standard","mode":"walk_in","duration_min":75}'
+```
+
+## Métriques (`/metrics`)
+
+`GET /metrics` expose les métriques au format texte Prometheus (bibliothèque officielle `prometheus-client`).
+
+| Métrique | Type | Labels | Signification |
+|---|---|---|---|
+| `pricing_http_requests_total` | counter | `method`, `route`, `status` | Requêtes HTTP traitées. Les erreurs se lisent avec `status` (4xx, 5xx) |
+| `pricing_http_request_duration_seconds` | histogram | `method`, `route` | Durée des requêtes |
+| `pricing_build_info` | info | `version` | Version déployée |
+| `pricing_quotes_computed_total` | counter | `zone`, `mode` | Devis calculés |
+| `pricing_quote_amount_eur` | histogram | `mode` | Montants des devis calculés |
+| `pricing_domain_errors_total` | counter | `code` | Requêtes refusées par une règle métier (`ZONE_NOT_FOUND`, `INVALID_DURATION`…) |
+| `pricing_grid_publications_total` | counter | `change` | Nouvelles versions de grille, par type de changement |
+| `pricing_active_grid_version` | gauge | — | Version de la grille en vigueur |
+| `pricing_admin_auth_failures_total` | counter | `reason` | Appels admin refusés |
+
+S'y ajoutent les métriques du processus fournies par la bibliothèque (`process_*`, `python_*` : mémoire, CPU, GC).
+
+Choix de conception :
+- le label `route` contient le **modèle de route** (`/quotes/{quote_id}`), jamais le chemin brut ; une URL inconnue est comptée sous `unmatched`. Sinon, chaque identifiant de devis ou chaque URL testée par un scanner créerait une nouvelle série ;
+- les valeurs sont **en mémoire** et repartent de zéro au redémarrage, ce que Prometheus gère nativement pour les compteurs ;
+- `/metrics` **n'interroge pas la base** : un scraping toutes les 15 s n'empêche donc pas Neon de se mettre en veille ;
+- les appels à `/metrics` sont loggés en DEBUG, pour ne pas noyer les logs d'une ligne toutes les 15 s ;
+- `/metrics` est public, comme `/health` : il ne contient aucune donnée personnelle ni aucun secret.
+
+Exemples de requêtes PromQL :
+
+```promql
+# Devis calculés par minute, par zone
+sum by (zone) (rate(pricing_quotes_computed_total[5m])) * 60
+
+# Taux de réponses en erreur serveur
+sum(rate(pricing_http_requests_total{status=~"5.."}[5m])) / sum(rate(pricing_http_requests_total[5m]))
+
+# Durée de réponse au 95e percentile de POST /quote
+histogram_quantile(0.95, sum by (le) (rate(pricing_http_request_duration_seconds_bucket{route="/quote"}[5m])))
 ```
 
 ## Base de données (Neon)
