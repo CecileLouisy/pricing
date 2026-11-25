@@ -5,6 +5,7 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from app import metrics
 from app.domain.errors import (
     DomainError,
     GridNotFound,
@@ -45,6 +46,7 @@ def register_error_handlers(app: FastAPI) -> None:
             request.url.path,
             str(exc),
         )
+        metrics.record_domain_error(exc.code)
         return JSONResponse(
             status_code=status_code,
             content={"code": exc.code, "message": str(exc)},

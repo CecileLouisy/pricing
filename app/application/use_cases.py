@@ -16,6 +16,7 @@ from uuid import UUID, uuid4
 
 from uuid6 import uuid7
 
+from app import metrics
 from app.application.ports import GridRepository, QuoteRepository
 from app.domain.errors import (
     GridNotFound,
@@ -126,6 +127,7 @@ def compute_quote(
         duration_min,
         amount,
     )
+    metrics.record_quote(zone, mode.value, amount)
     return quote
 
 
@@ -214,6 +216,7 @@ def update_rate(
         mode.value,
         new_hourly_rate_eur,
     )
+    metrics.record_grid_published("rate_updated", published.version)
     return published
 
 
@@ -238,6 +241,7 @@ def create_rate(
         mode.value,
         hourly_rate_eur,
     )
+    metrics.record_grid_published("rate_created", published.version)
     return published
 
 
@@ -256,6 +260,7 @@ def update_free_period(
         current.version,
         new_free_period_min,
     )
+    metrics.record_grid_published("free_period_updated", published.version)
     return published
 
 
@@ -282,4 +287,5 @@ def rename_zone(old_zone: str, new_zone: str, grids: GridRepository) -> PriceGri
         old_zone,
         new_zone,
     )
+    metrics.record_grid_published("zone_renamed", published.version)
     return published
