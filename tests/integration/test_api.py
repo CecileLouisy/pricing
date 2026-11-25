@@ -1,6 +1,7 @@
 """End-to-end integration tests — HTTP + in-file SQLite."""
 
 import os
+from uuid import UUID
 
 import pytest
 
@@ -9,10 +10,11 @@ os.environ["DATABASE_URL"] = "sqlite:///./test_pricing.db"
 os.environ["ADMIN_TOKEN"] = "test-token"
 
 from fastapi.testclient import TestClient  # noqa: E402
-from sqlalchemy import update  # noqa: E402
+from sqlalchemy import inspect, text, update  # noqa: E402
 
 from app.adapters.db.engine import Base, SessionLocal, engine, init_db  # noqa: E402
 from app.adapters.db.orm_models import RateORM  # noqa: E402
+from app.application import use_cases  # noqa: E402
 from app.main import app  # noqa: E402
 
 
@@ -248,3 +250,87 @@ class TestLogging:
         )
         assert "event=admin_auth_failed reason=invalid_token" in caplog.text
         assert "wrong-secret" not in caplog.text
+
+
+class TestCorrelationId:
+    HEADER = "X-Correlation-ID"
+
+    def _quote(self, client, headers=None):
+        return client.post(
+            "/quote",
+            headers=headers or {},
+            json={"zone": "standard", "mode": "walk_in", "duration_min": 75},
+        )
+
+    def test_received_id_is_reused_logged_and_stored(self, client, caplog):
+        caplog.set_level("INFO")
+        r = self._quote(client, headers={self.HEADER: "booking-42_abc"})
+        assert r.status_code == 201
+        assert r.headers[self.HEADER] == "booking-42_abc"
+        assert r.json()["correlation_id"] == "booking-42_abc"
+        # Every log line of the request carries the same ID.
+        for event in ("event=quote_computed", "event=http_request"):
+            record = next(rec for rec in caplog.records if event in rec.getMessage())
+            assert record.correlation_id == "booking-42_abc"
+        # Stored with the quote: retrievable later.
+        stored = client.get(f"/quotes/{r.json()['quote_id']}").json()
+        assert stored["correlation_id"] == "booking-42_abc"
+
+    def test_header_name_is_case_insensitive(self, client):
+        r = self._quote(client, headers={"x-correlation-id": "access-7"})
+        assert r.headers[self.HEADER] == "access-7"
+
+    def test_id_is_generated_when_missing(self, client):
+        r = self._quote(client)
+        generated = r.headers[self.HEADER]
+        assert UUID(generated)
+        assert r.json()["correlation_id"] == generated
+
+    def test_each_request_gets_its_own_generated_id(self, client):
+        first = client.get("/health").headers[self.HEADER]
+        second = client.get("/health").headers[self.HEADER]
+        assert first != second
+
+    def test_invalid_id_is_replaced_and_not_logged(self, client, caplog):
+        caplog.set_level("INFO")
+        r = self._quote(client, headers={self.HEADER: "bad id with spaces"})
+        assert r.status_code == 201
+        assert r.headers[self.HEADER] != "bad id with spaces"
+        assert UUID(r.headers[self.HEADER])
+        assert "event=invalid_correlation_id length=18 action=replaced" in caplog.text
+        assert "bad id with spaces" not in caplog.text
+
+    def test_too_long_id_is_replaced(self, client):
+        r = self._quote(client, headers={self.HEADER: "a" * 129})
+        assert UUID(r.headers[self.HEADER])
+
+    def test_error_responses_carry_the_id(self, client, caplog):
+        r = client.post(
+            "/quote",
+            headers={self.HEADER: "corr-404"},
+            json={"zone": "nope", "mode": "walk_in", "duration_min": 30},
+        )
+        assert r.status_code == 404
+        assert r.headers[self.HEADER] == "corr-404"
+        record = next(rec for rec in caplog.records if "event=domain_error" in rec.getMessage())
+        assert record.correlation_id == "corr-404"
+
+    def test_unexpected_error_log_carries_the_id(self, caplog, monkeypatch):
+        def boom(**_kwargs):
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(use_cases, "compute_quote", boom)
+        client = TestClient(app, raise_server_exceptions=False)
+        r = self._quote(client, headers={self.HEADER: "corr-500"})
+        assert r.status_code == 500
+        assert r.json() == {"code": "INTERNAL_ERROR", "message": "Internal server error"}
+        record = next(rec for rec in caplog.records if "event=unexpected_error" in rec.getMessage())
+        assert record.correlation_id == "corr-500"
+
+    def test_column_is_added_to_an_existing_database(self):
+        # Simulate a database created before the column existed (e.g. Neon).
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE quote DROP COLUMN correlation_id"))
+        init_db()
+        columns = {c["name"] for c in inspect(engine).get_columns("quote")}
+        assert "correlation_id" in columns

@@ -101,6 +101,7 @@ class QuoteResponse(BaseModel):
     currency: str = "EUR"
     breakdown: dict
     computed_at: datetime
+    correlation_id: str | None = None
 
     @classmethod
     def from_domain(cls, quote: Quote, grid_version: int | None = None) -> "QuoteResponse":
@@ -111,6 +112,7 @@ class QuoteResponse(BaseModel):
             amount_eur=quote.amount_eur,
             breakdown=quote.breakdown,
             computed_at=quote.computed_at,
+            correlation_id=quote.correlation_id,
         )
 
 

@@ -9,6 +9,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app import __version__
+from app.adapters.api.correlation_middleware import correlation_id_middleware
 from app.adapters.api.error_handlers import register_error_handlers
 from app.adapters.api.request_logging import request_logging_middleware
 from app.adapters.api.routers import grids, health, quotes, rates, root
@@ -18,6 +19,7 @@ from app.adapters.db.engine import SessionLocal, init_db
 from app.adapters.db.grid_repository import SqlGridRepository
 from app.application import use_cases
 from app.config import settings
+from app.correlation import HEADER as CORRELATION_HEADER
 from app.domain.value_objects import ZONE_RENAMES
 from app.logging_config import configure_logging
 
@@ -68,12 +70,16 @@ app.add_middleware(
     allow_origins=settings.cors_origins_list,
     allow_methods=["GET", "POST", "PATCH"],
     allow_headers=["*"],
+    # Lets the browser front read the correlation ID of a response.
+    expose_headers=[CORRELATION_HEADER],
     allow_credentials=False,
 )
 
 app.middleware("http")(security_headers_middleware)
-# Registered last so it wraps every other middleware and sees the final status.
+# Wraps every other middleware and sees the final status.
 app.middleware("http")(request_logging_middleware)
+# Registered last (outermost) so the request log line already carries the correlation ID.
+app.middleware("http")(correlation_id_middleware)
 
 register_error_handlers(app)
 

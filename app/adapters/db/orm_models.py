@@ -55,3 +55,5 @@ class QuoteORM(Base):
     amount_eur: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False)
     breakdown_json: Mapped[str] = mapped_column(String, nullable=False)
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # Added after the first deployment: see _add_missing_columns() in engine.py.
+    correlation_id: Mapped[str | None] = mapped_column(String(128), nullable=True)

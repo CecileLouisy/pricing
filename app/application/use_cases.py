@@ -78,6 +78,7 @@ def compute_quote(
     duration_min: int,
     grids: GridRepository,
     quotes: QuoteRepository,
+    correlation_id: str | None = None,
 ) -> Quote:
     zone = normalize_zone(zone)
     grid = _require_current_grid(grids)
@@ -113,6 +114,7 @@ def compute_quote(
         amount_eur=amount,
         breakdown=breakdown,
         computed_at=_now(),
+        correlation_id=correlation_id,
     )
     quotes.save(quote)
     logger.info(

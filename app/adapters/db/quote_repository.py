@@ -20,6 +20,7 @@ def _to_domain(row: QuoteORM) -> Quote:
         amount_eur=row.amount_eur,
         breakdown=json.loads(row.breakdown_json),
         computed_at=row.computed_at,
+        correlation_id=row.correlation_id,
     )
 
 
@@ -38,6 +39,7 @@ class SqlQuoteRepository:
                 amount_eur=quote.amount_eur,
                 breakdown_json=json.dumps(quote.breakdown),
                 computed_at=quote.computed_at,
+                correlation_id=quote.correlation_id,
             )
         )
         self._session.commit()

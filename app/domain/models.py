@@ -55,6 +55,9 @@ class Quote:
 
     Identified by a time-ordered UUID (v7): quotes are inherently timestamped
     events and querying them by time range is a common access pattern.
+
+    correlation_id links the quote to the workflow (Booking, Access) that asked
+    for it. It is None for quotes computed before it was recorded.
     """
 
     id: UUID
@@ -65,3 +68,4 @@ class Quote:
     amount_eur: Decimal
     breakdown: dict
     computed_at: datetime
+    correlation_id: str | None = None
