@@ -120,12 +120,35 @@ Une ligne par événement sur stdout, au format `clé=valeur` (lisible dans les 
 | `pricing.errors` | `domain_error` | WARNING | code d'erreur métier, route |
 | `pricing.errors` | `unexpected_error` | ERROR | stack trace complète (le client reçoit seulement un message générique) |
 | `pricing.security` | `admin_auth_failed` | WARNING | raison (`missing_token` / `invalid_token`), route — **le jeton n'est jamais loggé** |
+| `pricing.http` | `invalid_correlation_id` | WARNING | longueur de la valeur reçue (la valeur elle-même n'est pas loggée) |
+| `pricing.db` | `schema_upgraded` | INFO | table et colonne ajoutées au démarrage |
 
 Exemple :
 
 ```
-2026-11-18 09:13:20,498 level=INFO logger=pricing.business event=quote_computed quote_id=01a1edb7-... grid_version=1 zone=standard mode=walk_in duration_min=75 amount_eur=0.75
-2026-11-18 09:13:20,499 level=INFO logger=pricing.http event=http_request method=POST path=/quote status=201 duration_ms=10.2
+2026-11-25 14:21:37,902 level=INFO logger=pricing.business correlation_id=booking-42 event=quote_computed quote_id=01a212de-... grid_version=1 zone=handicapped mode=walk_in duration_min=120 amount_eur=1.50
+2026-11-25 14:21:37,904 level=INFO logger=pricing.http correlation_id=booking-42 event=http_request method=POST path=/quote status=201 duration_ms=11.6
+```
+
+### Correlation ID
+
+Chaque ligne de log porte un `correlation_id`, qui permet de suivre une même opération à travers plusieurs services (Booking ou Access → Pricing).
+
+- Pricing **reprend** l'en-tête `X-Correlation-ID` envoyé par l'appelant (Booking, Access). Le nom de l'en-tête n'est pas sensible à la casse.
+- S'il est absent (front, Swagger, curl), Pricing en **génère** un (UUID).
+- S'il est invalide (vide, plus de 128 caractères, ou caractères autres que lettres, chiffres, `-` et `_`), il est remplacé par un UUID généré et un warning `invalid_correlation_id` est loggé. La requête n'est pas rejetée.
+- L'identifiant est **renvoyé** dans l'en-tête `X-Correlation-ID` de la réponse, y compris en cas d'erreur, et exposé par CORS pour que le front puisse le lire.
+- Il est **enregistré avec le devis** (`correlation_id` dans la réponse de `POST /quote` et de `GET /quotes/{id}`). Les devis antérieurs ont `null`.
+- Hors requête (démarrage, arrêt), il vaut `-`.
+- Pricing n'appelle aucun autre service : il n'a rien à propager plus loin.
+
+C'est un identifiant technique opaque : il ne doit contenir aucune donnée personnelle (plaque, e-mail…).
+
+```bash
+curl -i -X POST https://pricing-9khk.onrender.com/quote \
+     -H "Content-Type: application/json" \
+     -H "X-Correlation-ID: booking-42" \
+     -d '{"zone":"standard","mode":"walk_in","duration_min":75}'
 ```
 
 ## Base de données (Neon)
@@ -137,6 +160,8 @@ Le disque d'un service Render gratuit est éphémère : une base SQLite y serait
 3. La coller dans la variable d'environnement `DATABASE_URL` du service Render.
 
 Le préfixe `postgresql://` est converti automatiquement vers le driver psycopg 3 (`app/config.py`). Au premier démarrage, les tables sont créées et la grille initiale est insérée ; les démarrages suivants réutilisent les données existantes.
+
+`create_all` ne modifie jamais une table existante. Les colonnes ajoutées après le premier déploiement (aujourd'hui `quote.correlation_id`) sont listées dans `_ADDED_COLUMNS` (`app/adapters/db/engine.py`) et ajoutées automatiquement au démarrage si elles manquent (`ALTER TABLE ... ADD COLUMN`). Pour des évolutions de schéma plus importantes, un outil de migration comme Alembic serait préférable.
 
 ## Déploiement Render
 

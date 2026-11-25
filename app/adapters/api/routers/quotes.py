@@ -10,6 +10,7 @@ from app.adapters.api.schemas import QuoteRequest, QuoteResponse
 from app.adapters.db.grid_repository import SqlGridRepository
 from app.adapters.db.quote_repository import SqlQuoteRepository
 from app.application import use_cases
+from app.correlation import get_correlation_id
 
 router = APIRouter(tags=["quotes"])
 
@@ -32,6 +33,7 @@ def create_quote(
         duration_min=body.duration_min,
         grids=grids,
         quotes=quotes,
+        correlation_id=get_correlation_id(),
     )
     grid = grids.get_by_id(quote.grid_id)
     return QuoteResponse.from_domain(quote, grid_version=grid.version if grid else None)
