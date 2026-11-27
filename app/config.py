@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     ADMIN_TOKEN: str = "change-me-in-production"
     CORS_ORIGINS: str = "*"
     LOG_LEVEL: str = "INFO"
+    # Set automatically by Render to the SHA of the deployed git commit.
+    RENDER_GIT_COMMIT: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -21,6 +23,11 @@ class Settings(BaseSettings):
             if url.startswith(prefix):
                 return "postgresql+psycopg://" + url.removeprefix(prefix)
         return url
+
+    @property
+    def git_commit(self) -> str:
+        """Short SHA of the deployed commit, "unknown" outside Render."""
+        return self.RENDER_GIT_COMMIT[:7] or "unknown"
 
     @property
     def cors_origins_list(self) -> list[str]:

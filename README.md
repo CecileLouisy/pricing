@@ -71,7 +71,7 @@ pip-audit --skip-editable         # audit de sécurité des dépendances
 radon cc app/ -a -nc              # complexité cyclomatique (fail si > C)
 ```
 
-Ces vérifications sont aussi exécutées automatiquement par GitHub Actions à chaque push et PR sur master.
+Ces vérifications sont aussi exécutées automatiquement par GitHub Actions à chaque push et PR sur master, ainsi qu'un job « Build & smoke test » : il installe le service avec la même commande que Render, le démarre et vérifie que `/health`, `/` (avec la bonne version) et `/metrics` répondent.
 
 ## Exemples d'appels
 
@@ -211,6 +211,28 @@ Le fichier `render.yaml` déclare le service. Sur Render :
 2. Renseigner `DATABASE_URL` (chaîne de connexion Neon, voir ci-dessus).
 3. Deploy.
 4. Le token admin est généré automatiquement (visible dans les env vars du dashboard Render).
+
+Ensuite, chaque merge sur `master` est déployé automatiquement (Auto-Deploy « On Commit », qui nécessite l'application GitHub Render installée sur le compte avec accès au dépôt).
+
+### Procédure de livraison
+
+1. Travailler sur une branche, ouvrir une PR vers `master`.
+2. La CI doit passer : lint, format, tests, audit des dépendances, complexité, build & smoke test. `master` est protégée : impossible de merger sinon.
+3. Merger la PR : Render redéploie automatiquement.
+4. Vérifier le déploiement : `GET /` affiche la version et le commit déployés (les 7 premiers caractères du SHA, fournis par Render dans `RENDER_GIT_COMMIT`), qui doivent correspondre au dernier commit de `master`.
+
+### Publier une version
+
+1. Sur une branche, augmenter la version dans `app/__init__.py` (seul endroit où elle est définie) et compléter `CHANGELOG.md` ; merger.
+2. Tagger le commit mergé sur `master` et pousser le tag :
+   ```bash
+   git checkout master && git pull
+   git tag v1.1.0
+   git push origin v1.1.0
+   ```
+3. Le workflow `release.yml` vérifie que le tag correspond à la version du code, puis publie la release GitHub avec les notes générées depuis les PR.
+
+La version et le commit en production se lisent sur `GET /`, dans la métrique `pricing_build_info` et dans le log `event=startup`.
 
 ## Périmètre
 

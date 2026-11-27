@@ -125,6 +125,7 @@ class FreePeriodResponse(BaseModel):
 class RootResponse(BaseModel):
     service: str = "pricing"
     version: str
+    commit: str
     docs: str = "/docs"
     health: str = "/health"
 

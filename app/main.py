@@ -49,7 +49,9 @@ async def lifespan(_app: FastAPI):
         for old_zone, new_zone in ZONE_RENAMES.items():
             use_cases.rename_zone(old_zone, new_zone, grids)
         metrics.set_active_grid_version(use_cases.get_current_grid(grids).version)
-    logger.info("event=startup version=%s env=%s", __version__, settings.ENV)
+    logger.info(
+        "event=startup version=%s commit=%s env=%s", __version__, settings.git_commit, settings.ENV
+    )
     yield
     logger.info("event=shutdown")
 

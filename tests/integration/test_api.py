@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from prometheus_client import REGISTRY  # noqa: E402
 from sqlalchemy import inspect, text, update  # noqa: E402
 
+from app import __version__  # noqa: E402
 from app.adapters.db.engine import Base, SessionLocal, engine, init_db  # noqa: E402
 from app.adapters.db.orm_models import RateORM  # noqa: E402
 from app.application import use_cases  # noqa: E402
@@ -43,7 +44,8 @@ class TestHealth:
         assert r.status_code == 200
         assert r.json() == {
             "service": "pricing",
-            "version": "1.0.0",
+            "version": __version__,
+            "commit": "unknown",
             "docs": "/docs",
             "health": "/health",
         }
@@ -347,7 +349,7 @@ class TestMetrics:
         assert r.status_code == 200
         assert r.headers["content-type"].startswith("text/plain")
         assert "# TYPE pricing_http_requests_total counter" in r.text
-        assert 'pricing_build_info{version="1.0.0"} 1.0' in r.text
+        assert f'pricing_build_info{{commit="unknown",version="{__version__}"}} 1.0' in r.text
 
     def test_quote_increments_business_and_http_metrics(self, client):
         quotes = {"zone": "standard", "mode": "walk_in"}
