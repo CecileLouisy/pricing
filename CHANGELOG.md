@@ -2,6 +2,28 @@
 
 Versions suivent le [versionnage sémantique](https://semver.org/lang/fr/) : `MAJEUR.MINEUR.CORRECTIF`. La version est définie à un seul endroit, `app/__init__.py`.
 
+## 2.0.0 — 27 novembre 2026
+
+Version majeure : `POST /quote` et `GET /quotes/{id}` exigent désormais une authentification, ce qui casse les appelants qui ne l'envoient pas (#14).
+
+### Changements incompatibles
+- `POST /quote` exige la clé API du service appelant dans l'en-tête `X-API-Key` (une clé par service : `BOOKING_API_KEY`, `ACCESS_API_KEY`). Sans clé valide : `401 UNAUTHORIZED`.
+- `GET /quotes/{id}` exige la clé API d'un service appelant ou le jeton admin (`X-Admin-Token`).
+- En production, le service refuse de démarrer si `ADMIN_TOKEN`, `BOOKING_API_KEY` ou `ACCESS_API_KEY` est absent, garde sa valeur par défaut ou fait moins de 16 caractères.
+
+### Ajouté
+- `POST /simulate`, public et limité à 30 requêtes/min par IP : même calcul qu'un devis, sans enregistrement. Le simulateur du front l'utilise.
+- Service appelant (`caller=booking|access|admin`) dans le log de chaque requête authentifiée.
+- Métriques `pricing_simulations_total`, `pricing_api_calls_total{caller}` et `pricing_api_auth_failures_total{reason}`, et deux panneaux dans le tableau de bord Grafana.
+
+### Corrigé
+- Un en-tête d'authentification contenant un caractère non ASCII provoquait une erreur 500 ; il est maintenant refusé en 401.
+
+### Migration pour les services appelants
+1. Récupérer sa clé auprès de l'équipe Pricing (transmise par un canal privé).
+2. L'ajouter dans ses propres variables d'environnement, jamais dans le code.
+3. L'envoyer dans l'en-tête `X-API-Key` de chaque appel à `POST /quote` et `GET /quotes/{id}`.
+
 ## 1.1.0 — 27 novembre 2026
 
 ### Ajouté

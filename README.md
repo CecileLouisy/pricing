@@ -250,8 +250,8 @@ Ensuite, chaque merge sur `master` est déployé automatiquement (Auto-Deploy «
 2. Tagger le commit mergé sur `master` et pousser le tag :
    ```bash
    git checkout master && git pull
-   git tag v1.1.0
-   git push origin v1.1.0
+   git tag v2.0.0
+   git push origin v2.0.0
    ```
 3. Le workflow `release.yml` vérifie que le tag correspond à la version du code, puis publie la release GitHub avec les notes générées depuis les PR.
 
