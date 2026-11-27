@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from app import __version__
 from app.adapters.api.schemas import RootResponse
+from app.config import settings
 
 router = APIRouter(tags=["health"])
 
@@ -16,4 +17,4 @@ router = APIRouter(tags=["health"])
     summary="Service identity and useful links",
 )
 def root() -> RootResponse:
-    return RootResponse(version=__version__)
+    return RootResponse(version=__version__, commit=settings.git_commit)

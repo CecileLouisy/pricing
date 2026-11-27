@@ -76,3 +76,29 @@ jobs:
 
       - name: Check complexity
         run: radon cc app/ -a -nc
+
+  build:
+    name: Build & smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Same install and start commands as render.yaml.
+      - name: Install the service
+        run: pip install -e .
+
+      - name: Start the service and check that it answers
+        env:
+          DATABASE_URL: sqlite:///./smoke.db
+          ADMIN_TOKEN: smoke-test
+        run: |
+          uvicorn app.main:app --host 127.0.0.1 --port 8000 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8000/health && break; sleep 1; done
+          curl -sf http://127.0.0.1:8000/health
+          VERSION=$(python -c "import app; print(app.__version__)")
+          curl -sf http://127.0.0.1:8000/ | grep "\"version\":\"$VERSION\""
+          curl -sf http://127.0.0.1:8000/metrics | grep "pricing_build_info"

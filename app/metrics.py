@@ -13,6 +13,7 @@ from decimal import Decimal
 from prometheus_client import Counter, Gauge, Histogram, Info, disable_created_metrics
 
 from app import __version__
+from app.config import settings
 
 # Drop the extra "*_created" timestamp series: they double the output for no use here.
 disable_created_metrics()
@@ -31,8 +32,8 @@ HTTP_REQUEST_DURATION = Histogram(
     ["method", "route"],
 )
 
-BUILD_INFO = Info("pricing_build", "Version of the running service.")
-BUILD_INFO.info({"version": __version__})
+BUILD_INFO = Info("pricing_build", "Version and git commit of the running service.")
+BUILD_INFO.info({"version": __version__, "commit": settings.git_commit})
 
 # ---------- Business ----------
 
