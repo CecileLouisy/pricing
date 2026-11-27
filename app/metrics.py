@@ -67,6 +67,24 @@ ACTIVE_GRID_VERSION = Gauge(
     "Version number of the price grid currently in force.",
 )
 
+SIMULATIONS = Counter(
+    "pricing_simulations_total",
+    "Public price simulations (not stored), by zone and mode.",
+    ["zone", "mode"],
+)
+
+API_CALLS = Counter(
+    "pricing_api_calls_total",
+    "Authenticated calls to quote endpoints, by calling service.",
+    ["caller"],
+)
+
+API_AUTH_FAILURES = Counter(
+    "pricing_api_auth_failures_total",
+    "Calls rejected for a missing or invalid API key, by reason.",
+    ["reason"],
+)
+
 ADMIN_AUTH_FAILURES = Counter(
     "pricing_admin_auth_failures_total",
     "Rejected admin calls, by reason.",
@@ -99,3 +117,15 @@ def record_domain_error(code: str) -> None:
 
 def record_admin_auth_failure(reason: str) -> None:
     ADMIN_AUTH_FAILURES.labels(reason=reason).inc()
+
+
+def record_simulation(zone: str, mode: str) -> None:
+    SIMULATIONS.labels(zone=zone, mode=mode).inc()
+
+
+def record_api_call(caller: str) -> None:
+    API_CALLS.labels(caller=caller).inc()
+
+
+def record_api_auth_failure(reason: str) -> None:
+    API_AUTH_FAILURES.labels(reason=reason).inc()

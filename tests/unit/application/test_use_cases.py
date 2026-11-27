@@ -128,6 +128,20 @@ class TestComputeQuote:
             use_cases.compute_quote("standard", Mode.WALK_IN, 60, empty, quotes)
 
 
+class TestSimulatePrice:
+    def test_same_price_as_a_quote_but_nothing_stored(self, grids, quotes):
+        amount, breakdown, grid = use_cases.simulate_price("standard", Mode.WALK_IN, 75, grids)
+        quote = use_cases.compute_quote("standard", Mode.WALK_IN, 75, grids, quotes)
+        assert amount == quote.amount_eur == Decimal("3.00")
+        assert breakdown == quote.breakdown
+        assert grid.id == quote.grid_id
+        assert len(quotes._quotes) == 1  # only the quote, not the simulation
+
+    def test_unknown_zone_raises(self, grids):
+        with pytest.raises(ZoneNotFound):
+            use_cases.simulate_price("moon_base", Mode.WALK_IN, 60, grids)
+
+
 # --------- Retrieval ---------
 
 
