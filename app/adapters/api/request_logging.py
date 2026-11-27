@@ -45,9 +45,11 @@ async def request_logging_middleware(request: Request, call_next) -> Response:
             level = logging.INFO
         logger.log(
             level,
-            "event=http_request method=%s path=%s status=%d duration_ms=%.1f",
+            "event=http_request method=%s path=%s status=%d duration_ms=%.1f caller=%s",
             request.method,
             request.url.path,
             status_code,
             duration_s * 1000,
+            # Set by the authentication dependencies: booking, access or admin.
+            getattr(request.state, "caller", "-"),
         )

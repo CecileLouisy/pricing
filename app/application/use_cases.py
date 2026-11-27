@@ -81,30 +81,10 @@ def compute_quote(
     quotes: QuoteRepository,
     correlation_id: str | None = None,
 ) -> Quote:
+    """Compute a price and store it as a quote (Booking, Access): traceable later."""
     zone = normalize_zone(zone)
     grid = _require_current_grid(grids)
-
-    rate = grid.find_rate(zone, mode)
-    if rate is None:
-        # Distinguish an unknown zone from a missing mode for a known zone.
-        zones_available = {r.zone for r in grid.rates}
-        if zone not in zones_available:
-            raise ZoneNotFound(zone)
-        raise ModeNotFound(f"mode '{mode.value}' not defined for zone '{zone}'")
-
-    if mode is Mode.WALK_IN:
-        amount, breakdown = compute_walk_in(
-            duration_min=duration_min,
-            free_period_min=grid.free_period_min,
-            hourly_rate_eur=rate.hourly_rate_eur,
-        )
-    else:
-        amount, breakdown = compute_reserved(
-            duration_min=duration_min,
-            hourly_rate_eur=rate.hourly_rate_eur,
-        )
-
-    breakdown = {"zone": zone, "mode": mode.value, **breakdown}
+    amount, breakdown = _price(zone, mode, duration_min, grid)
 
     quote = Quote(
         id=uuid7(),
@@ -129,6 +109,54 @@ def compute_quote(
     )
     metrics.record_quote(zone, mode.value, amount)
     return quote
+
+
+def simulate_price(
+    zone: str,
+    mode: Mode,
+    duration_min: int,
+    grids: GridRepository,
+) -> tuple[Decimal, dict, PriceGrid]:
+    """Public simulation: same computation as a quote, but nothing is stored."""
+    zone = normalize_zone(zone)
+    grid = _require_current_grid(grids)
+    amount, breakdown = _price(zone, mode, duration_min, grid)
+    logger.info(
+        "event=price_simulated grid_version=%d zone=%s mode=%s duration_min=%d amount_eur=%s",
+        grid.version,
+        zone,
+        mode.value,
+        duration_min,
+        amount,
+    )
+    metrics.record_simulation(zone, mode.value)
+    return amount, breakdown, grid
+
+
+def _price(zone: str, mode: Mode, duration_min: int, grid: PriceGrid) -> tuple[Decimal, dict]:
+    """Apply the pricing rule of the mode with the rate of the zone in this grid."""
+    rate = grid.find_rate(zone, mode)
+    if rate is None:
+        # Distinguish an unknown zone from a missing mode for a known zone.
+        zones_available = {r.zone for r in grid.rates}
+        if zone not in zones_available:
+            raise ZoneNotFound(zone)
+        raise ModeNotFound(f"mode '{mode.value}' not defined for zone '{zone}'")
+
+    if mode is Mode.WALK_IN:
+        amount, breakdown = compute_walk_in(
+            duration_min=duration_min,
+            free_period_min=grid.free_period_min,
+            hourly_rate_eur=rate.hourly_rate_eur,
+        )
+    else:
+        amount, breakdown = compute_reserved(
+            duration_min=duration_min,
+            hourly_rate_eur=rate.hourly_rate_eur,
+        )
+
+    breakdown = {"zone": zone, "mode": mode.value, **breakdown}
+    return amount, breakdown
 
 
 # ---------- Administration: every write publishes a new grid version ----------

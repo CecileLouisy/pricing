@@ -8,6 +8,11 @@ import pytest
 # Force an ephemeral SQLite database before importing the app
 os.environ["DATABASE_URL"] = "sqlite:///./test_pricing.db"
 os.environ["ADMIN_TOKEN"] = "test-token"
+os.environ["BOOKING_API_KEY"] = "booking-test-key-0123456789"
+os.environ["ACCESS_API_KEY"] = "access-test-key-0123456789"
+
+# Calling-service credentials sent by default by the test client.
+BOOKING = {"X-API-Key": "booking-test-key-0123456789"}
 
 from fastapi.testclient import TestClient  # noqa: E402
 from prometheus_client import REGISTRY  # noqa: E402
@@ -15,8 +20,9 @@ from sqlalchemy import inspect, text, update  # noqa: E402
 
 from app import __version__  # noqa: E402
 from app.adapters.db.engine import Base, SessionLocal, engine, init_db  # noqa: E402
-from app.adapters.db.orm_models import RateORM  # noqa: E402
+from app.adapters.db.orm_models import QuoteORM, RateORM  # noqa: E402
 from app.application import use_cases  # noqa: E402
+from app.config import settings  # noqa: E402
 from app.main import app  # noqa: E402
 
 
@@ -30,7 +36,7 @@ def _fresh_db():
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    return TestClient(app, headers=BOOKING)
 
 
 class TestHealth:
@@ -323,7 +329,7 @@ class TestCorrelationId:
             raise RuntimeError("boom")
 
         monkeypatch.setattr(use_cases, "compute_quote", boom)
-        client = TestClient(app, raise_server_exceptions=False)
+        client = TestClient(app, raise_server_exceptions=False, headers=BOOKING)
         r = self._quote(client, headers={self.HEADER: "corr-500"})
         assert r.status_code == 500
         assert r.json() == {"code": "INTERNAL_ERROR", "message": "Internal server error"}
@@ -418,3 +424,126 @@ class TestMetrics:
         caplog.set_level("INFO")
         client.get("/metrics")
         assert "path=/metrics" not in caplog.text
+
+
+class TestApiKeyAuthentication:
+    QUOTE = {"zone": "standard", "mode": "walk_in", "duration_min": 75}
+
+    def test_quote_without_key_is_rejected(self, caplog):
+        r = TestClient(app).post("/quote", json=self.QUOTE)
+        assert r.status_code == 401
+        assert r.json()["detail"]["code"] == "UNAUTHORIZED"
+        assert "event=api_auth_failed reason=missing_key" in caplog.text
+
+    def test_quote_with_invalid_key_is_rejected_and_key_not_logged(self, caplog):
+        before = _sample("pricing_api_auth_failures_total", {"reason": "invalid_key"})
+        r = TestClient(app).post(
+            "/quote", headers={"X-API-Key": "stolen-or-wrong-key"}, json=self.QUOTE
+        )
+        assert r.status_code == 401
+        assert "event=api_auth_failed reason=invalid_key" in caplog.text
+        assert "stolen-or-wrong-key" not in caplog.text
+        assert _sample("pricing_api_auth_failures_total", {"reason": "invalid_key"}) == before + 1
+
+    def test_non_ascii_key_is_rejected_without_server_error(self):
+        r = TestClient(app).post(
+            # Raw latin-1 bytes, as a misconfigured client could send them.
+            "/quote",
+            headers={"X-API-Key": "cl\u00e9".encode("latin-1")},
+            json=self.QUOTE,
+        )
+        assert r.status_code == 401
+
+    def test_admin_token_does_not_replace_api_key_to_create_quotes(self):
+        r = TestClient(app).post("/quote", headers={"X-Admin-Token": "test-token"}, json=self.QUOTE)
+        assert r.status_code == 401
+
+    def test_auth_is_checked_before_body_validation(self):
+        r = TestClient(app).post("/quote", json={"zone": "standard"})
+        assert r.status_code == 401
+
+    @pytest.mark.parametrize(
+        ("key", "caller"),
+        [
+            ("booking-test-key-0123456789", "booking"),
+            ("access-test-key-0123456789", "access"),
+        ],
+    )
+    def test_each_service_is_identified_by_its_key(self, key, caller, caplog):
+        caplog.set_level("INFO")
+        before = _sample("pricing_api_calls_total", {"caller": caller})
+        r = TestClient(app).post("/quote", headers={"X-API-Key": key}, json=self.QUOTE)
+        assert r.status_code == 201
+        assert "path=/quote status=201" in caplog.text
+        assert f"caller={caller}" in caplog.text
+        assert _sample("pricing_api_calls_total", {"caller": caller}) == before + 1
+
+    def test_quote_lookup_accepts_api_key_or_admin_token(self, client):
+        quote_id = client.post("/quote", json=self.QUOTE).json()["quote_id"]
+        anonymous = TestClient(app)
+        assert anonymous.get(f"/quotes/{quote_id}").status_code == 401
+        assert anonymous.get(f"/quotes/{quote_id}", headers=BOOKING).status_code == 200
+        admin = anonymous.get(f"/quotes/{quote_id}", headers={"X-Admin-Token": "test-token"})
+        assert admin.status_code == 200
+
+    @pytest.mark.parametrize(
+        "path", ["/", "/health", "/metrics", "/rates", "/grids", "/grids/current"]
+    )
+    def test_reads_stay_public(self, path):
+        assert TestClient(app).get(path).status_code == 200
+
+
+class TestSimulation:
+    def test_simulation_is_public_and_matches_the_quote(self, client):
+        body = {"zone": "standard", "mode": "walk_in", "duration_min": 75}
+        simulated = TestClient(app).post("/simulate", json=body)
+        assert simulated.status_code == 200
+        quote = client.post("/quote", json=body).json()
+        assert simulated.json()["amount_eur"] == quote["amount_eur"] == "0.75"
+        assert simulated.json()["breakdown"] == quote["breakdown"]
+        assert simulated.json()["grid_version"] == 1
+
+    def test_simulation_is_not_stored(self):
+        TestClient(app).post(
+            "/simulate", json={"zone": "xl", "mode": "reserved", "duration_min": 120}
+        )
+        with SessionLocal() as session:
+            assert session.query(QuoteORM).count() == 0
+
+    def test_simulation_has_no_quote_id(self):
+        r = TestClient(app).post(
+            "/simulate", json={"zone": "xl", "mode": "reserved", "duration_min": 120}
+        )
+        assert "quote_id" not in r.json()
+        assert r.json()["amount_eur"] == "8.00"
+
+    def test_simulation_is_counted_and_logged(self, caplog):
+        caplog.set_level("INFO")
+        labels = {"zone": "electric", "mode": "walk_in"}
+        before = _sample("pricing_simulations_total", labels)
+        TestClient(app).post(
+            "/simulate", json={"zone": "ELECTRIC", "mode": "walk_in", "duration_min": 90}
+        )
+        assert _sample("pricing_simulations_total", labels) == before + 1
+        assert "event=price_simulated" in caplog.text
+
+    def test_simulation_errors_are_clean(self):
+        r = TestClient(app).post(
+            "/simulate", json={"zone": "nope", "mode": "walk_in", "duration_min": 30}
+        )
+        assert r.status_code == 404
+        assert r.json()["code"] == "ZONE_NOT_FOUND"
+
+
+class TestProductionSecrets:
+    def test_service_refuses_to_start_in_production_with_unsafe_secrets(self, monkeypatch):
+        monkeypatch.setattr(settings, "ENV", "production")
+        monkeypatch.setattr(settings, "ADMIN_TOKEN", "change-me-in-production")
+        with pytest.raises(RuntimeError, match="ADMIN_TOKEN"), TestClient(app):
+            pass
+
+    def test_service_starts_in_production_with_safe_secrets(self, monkeypatch):
+        monkeypatch.setattr(settings, "ENV", "production")
+        monkeypatch.setattr(settings, "ADMIN_TOKEN", "a-long-and-random-admin-token")
+        with TestClient(app) as started:
+            assert started.get("/health").status_code == 200

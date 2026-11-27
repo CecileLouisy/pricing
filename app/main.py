@@ -41,8 +41,18 @@ computation.
 """
 
 
+def check_production_secrets() -> None:
+    """Refuse to start in production with a missing, default or too short secret."""
+    unsafe = settings.unsafe_secrets()
+    if settings.ENV == "production" and unsafe:
+        # Only the variable names are logged, never their values.
+        logger.critical("event=startup_refused reason=unsafe_secrets secrets=%s", ",".join(unsafe))
+        raise RuntimeError(f"Unsafe or missing secrets in production: {', '.join(unsafe)}")
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    check_production_secrets()
     init_db()
     with SessionLocal() as session:
         grids = SqlGridRepository(session)

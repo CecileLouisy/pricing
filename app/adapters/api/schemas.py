@@ -116,6 +116,16 @@ class QuoteResponse(BaseModel):
         )
 
 
+class SimulationResponse(BaseModel):
+    """Public price simulation: same computation as a quote, nothing is stored."""
+
+    grid_id: UUID
+    grid_version: int
+    amount_eur: Decimal
+    currency: str = "EUR"
+    breakdown: dict
+
+
 class FreePeriodResponse(BaseModel):
     free_period_min: int
     grid_id: UUID
